@@ -9,12 +9,12 @@ function FilePreview({ file }) {
 
   useEffect(() => {
     if (!file) return
-    if (file.type.startsWith('image/')) {
+    if (file._type?.startsWith('image/') || file.type?.startsWith('image/') || file.type === 'image') {
       const url = URL.createObjectURL(file)
       setPreview(url)
       return () => URL.revokeObjectURL(url)
     }
-    if (file.type.startsWith('video/')) {
+    if (file._type?.startsWith('video/') || file.type?.startsWith('video/') || file.type === 'video') {
       const url = URL.createObjectURL(file)
       setPreview(url)
       return () => URL.revokeObjectURL(url)
