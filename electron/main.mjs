@@ -62,7 +62,7 @@ app.whenReady().then(() => {
     title: '画影客', backgroundColor: '#0f1117', show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true, nodeIntegration: false
+      contextIsolation: true, nodeIntegration: false, webSecurity: false
     }
   })
   mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
