@@ -21,7 +21,12 @@ jobs:
       - name: Package with Electron
         run: |
           npm install electron@31 electron-builder --save-dev
-          npx electron-builder --win portable --config.build.win.target=portable --config.build.productName=ArtShadow --config.build.appId=com.artshadow.app --config.directories.output=release
+          npx electron-builder --win portable ^
+            --config.build.win.target=portable ^
+            --config.build.productName="画影客" ^
+            --config.build.appId=com.artshadow.app ^
+            --config.directories.output=release ^
+            --config.files='["dist/**/*","electron/**/*","node_modules/**/*","package.json"]'
 
       - uses: actions/upload-artifact@v4
         with:

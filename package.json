@@ -2,7 +2,7 @@
   "name": "art-shadow",
   "version": "1.0.0",
   "description": "参考素材管理软件",
-  "main": "electron/main.js",
+  "main": "electron/main.mjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
