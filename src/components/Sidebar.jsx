@@ -120,7 +120,7 @@ export default function Sidebar() {
     }
   }
 
-  const handleImport = async () => { if (window.electronAPI) { const files = await window.electronAPI.openFiles(); if (files.length > 0) { setPendingFiles(files); setShowImportModal(true) } return }
+  const handleImport = async () => { if (window.electronAPI) { const files = await window.electronAPI.openFiles(); if (files.length > 0) { const normalized = files.map(f => ({ ...f, type: f.type==='video'?'video/mp4':'image/jpeg', name: f.originalName, _isElectron: true })); setPendingFiles(normalized); setShowImportModal(true) } return }
     const input = document.createElement('input'); input.type = 'file'; input.multiple = true; input.accept = 'video/*,image/*'
     input.onchange = (e) => {
       const files = Array.from(e.target.files)
