@@ -1,4 +1,4 @@
-﻿import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let mainWindow = null
 
-// Store materials in app data folder
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
 const materialsDir = path.join(dataDir, 'materials')
 const dbPath = path.join(dataDir, 'data.json')
@@ -25,11 +24,12 @@ function loadData() {
 
 function saveData(data) { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)) }
 
-// IPC: Data operations
+// Register custom protocol to serve materials
+protocol.registerSchemesAsPrivileged([{ scheme: 'artshadow', privileges: { bypassCSP: true, stream: true, supportFetchAPI: true } }])
+
 ipcMain.handle('data:getAll', () => loadData())
 ipcMain.handle('data:save', (_, data) => { saveData(data); return { success: true } })
 
-// IPC: Import files
 ipcMain.handle('dialog:openFiles', async () => {
   const r = await dialog.showOpenDialog(mainWindow, {
     title: '导入素材', filters: [{ name: '媒体文件', extensions: ['mp4','webm','mov','avi','mkv','jpg','jpeg','png','gif','webp','bmp'] }],
@@ -44,7 +44,7 @@ ipcMain.handle('dialog:openFiles', async () => {
     const dest = path.join(materialsDir, newName)
     fs.copyFileSync(fp, dest)
     return {
-      id, originalName: path.basename(fp), fileName: newName, filePath: dest,
+      id, originalName: path.basename(fp), fileName: newName,
       type: ['.mp4','.webm','.mov','.avi','.mkv'].includes(ext) ? 'video' : 'image',
       size: fs.statSync(dest).size, categoryId: null, tags: [], source: '', notes: '',
       importedAt: new Date().toISOString()
@@ -52,21 +52,35 @@ ipcMain.handle('dialog:openFiles', async () => {
   })
 })
 
-// IPC: Get material file path for playback
-ipcMain.handle('materials:getPath', (_, fileName) => path.join(materialsDir, fileName))
+// Return custom protocol URL for material files
+ipcMain.handle('materials:getPath', (_, fileName) => {
+  return `artshadow://files/${fileName}`
+})
 
 app.whenReady().then(() => {
   ensureDirs()
+
+  // Register protocol handler
+  protocol.handle('artshadow', (request) => {
+    const url = new URL(request.url)
+    if (url.hostname === 'files') {
+      const filePath = path.join(materialsDir, path.basename(url.pathname))
+      return net.fetch('file://' + filePath)
+    }
+    return new Response('Not Found', { status: 404 })
+  })
+
   mainWindow = new BrowserWindow({
     width: 1400, height: 900, minWidth: 900, minHeight: 600,
     title: '画影客', backgroundColor: '#0f1117', show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true, nodeIntegration: false, webSecurity: false
+      contextIsolation: true, nodeIntegration: false
     }
   })
+
   mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
-  mainWindow.once('ready-to-show', () => { mainWindow.show() })
+  mainWindow.once('ready-to-show', () => mainWindow.show())
   mainWindow.removeMenu()
 })
 
