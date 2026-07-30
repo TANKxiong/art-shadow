@@ -120,15 +120,21 @@ export default function Sidebar() {
     }
   }
 
+
   const handleImport = async () => {
-    try {
     if (window.electronAPI) {
-      const files = await window.electronAPI.openFiles()
-      if (files.length > 0) {
-        const norm = files.map(f => ({ ...f, name: f.originalName, _type: f.type==='video'?'video/mp4':'image/jpeg', _isElectron: true }))
-        setPendingFiles(norm)
-        setShowImportModal(true)
-      }
+      try {
+        const files = await window.electronAPI.openFiles()
+        if (files && files.length > 0) {
+          const norm = files.map(f => ({
+            ...f, name: f.originalName || '',
+            type: f.type === 'video' ? 'video/mp4' : 'image/jpeg',
+            _isElectron: true
+          }))
+          setPendingFiles(norm)
+          setShowImportModal(true)
+        }
+      } catch (e) { console.error('Import error:', e) }
       return
     }
     const input = document.createElement('input')
@@ -138,19 +144,18 @@ export default function Sidebar() {
       if (files.length > 0) { setPendingFiles(files); setShowImportModal(true) }
     }
     input.click()
-    } catch (e) { console.error('Import error:', e) }
   }
 
-  const doImport = async (categoryId, trimRanges = {}) => {
+  const doImport = (categoryId, trimRanges = {}) => {
     if (!pendingFiles) return
     const isEl = pendingFiles[0]?._isElectron
     const imported = pendingFiles.map(f => {
       const name = f.originalName || f.name || ''
       const isVid = /\.(mp4|webm|mov|avi|mkv)$/i.test(name)
       return {
-        id: f.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        originalName: f.originalName || f.name,
-        fileName: f.fileName || f.name,
+        id: f.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+        originalName: name,
+        fileName: f.fileName || name,
         type: isVid ? 'video' : 'image',
         size: f.size || 0,
         categoryId,
