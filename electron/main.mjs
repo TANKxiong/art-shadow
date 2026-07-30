@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+﻿import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -59,13 +59,14 @@ app.whenReady().then(() => {
   ensureDirs()
   mainWindow = new BrowserWindow({
     width: 1400, height: 900, minWidth: 900, minHeight: 600,
-    title: '画影客', backgroundColor: '#f4f7fb',
+    title: '画影客', backgroundColor: '#0f1117', show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, nodeIntegration: false
     }
   })
   mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  mainWindow.once('ready-to-show', () => { mainWindow.show() })
   mainWindow.removeMenu()
 })
 
