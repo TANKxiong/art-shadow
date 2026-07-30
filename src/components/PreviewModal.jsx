@@ -42,7 +42,17 @@ export default function PreviewModal() {
     }
 
     if (window.electronAPI && previewMaterial.fileName) {
-      window.electronAPI.getMaterialPath(previewMaterial.fileName).then(setVideoSrc)
+      window.electronAPI.getMaterialPath(previewMaterial.fileName).then(p => {
+        setVideoSrc(p)
+        // Fallback: if file:// fails, try HTTP
+        setTimeout(() => {
+          const v = videoRef.current
+          if (v && v.readyState === 0 && p.startsWith('file://')) {
+            const httpUrl = p.replace(/file:\/\/\/.*materials\//, 'http://localhost:58099/')
+            setVideoSrc(httpUrl)
+          }
+        }, 1000)
+      })
     } else if (previewMaterial._file) {
       const url = URL.createObjectURL(previewMaterial._file)
       setVideoSrc(url)
