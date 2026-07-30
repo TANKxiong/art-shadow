@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+﻿import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -78,7 +78,7 @@ app.whenReady().then(() => {
     width: 1400, height: 900, minWidth: 900, minHeight: 600,
     title: '画影客', backgroundColor: '#0f1117', show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true, nodeIntegration: false
     }
   })

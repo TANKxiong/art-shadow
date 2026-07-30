@@ -9,6 +9,12 @@
     "electron/**/*",
     "package.json"
   ],
+  "extraResources": [
+    {
+      "from": "public/",
+      "to": "public/"
+    }
+  ],
   "win": {
     "target": "portable"
   }
