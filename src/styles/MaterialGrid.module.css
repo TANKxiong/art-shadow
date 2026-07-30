@@ -1,0 +1,118 @@
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  align-items: start;
+  grid-auto-rows: 1fr;
+}
+
+.grid.list {
+  grid-template-columns: 1fr;
+}
+
+.grid.list .card {
+  display: flex;
+  flex-direction: row;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+
+.empty p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.dragOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(91,155,213,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dragBox {
+  padding: 40px 80px;
+  border: 4px dashed var(--primary);
+  border-radius: var(--radius-lg);
+  background: rgba(255,255,255,0.9);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.titleActions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.batchBtn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-family: inherit;
+}
+
+.batchBtn:hover { background: var(--surface-hover); }
+
+.batchDelBtn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--danger);
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.batchDelBtn:hover { background: #fee2e2; }
+
+.checkOverlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+}
+
+.checkbox {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}

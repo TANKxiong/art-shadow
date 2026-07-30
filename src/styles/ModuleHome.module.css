@@ -1,0 +1,140 @@
+﻿.moduleHome {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0f6fd 0%, #e8f2fb 50%, #f4f7fb 100%);
+  padding: 32px;
+}
+
+.moduleTitle {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 60px;
+  font-weight: 400;
+  color: #1a1a2e;
+  margin-bottom: 4px;
+  letter-spacing: 6px;
+  text-shadow: 1px 2px 4px rgba(0,0,0,0.08);
+}
+
+.moduleSub {
+  font-size: 16px;
+  color: var(--text-muted);
+  margin-bottom: 48px;
+}
+
+.moduleCards {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  padding: 0 40px;
+  align-items: stretch;
+}
+
+.moduleCard {
+  flex: 1;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 48px 32px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 1px solid var(--border);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.moduleCard::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  transition: height 0.3s;
+}
+
+.moduleCard:nth-child(1)::before { background: var(--primary); }
+.moduleCard:nth-child(2)::before { background: #f59e0b; }
+.moduleCard:nth-child(3)::before { background: #10b981; }
+
+.moduleCard:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+}
+
+.moduleCard:hover::before {
+  height: 6px;
+}
+
+.moduleIcon {
+  font-size: 72px;
+  margin-bottom: 20px;
+}
+
+.moduleName {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.moduleDesc {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 280px;
+}
+
+.moduleTag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 14px;
+}
+
+.moduleTag:nth-child(1) ~ .moduleTag { margin-left: 6px; }
+
+.tagBlue { background: var(--primary-light); color: var(--primary-dark); }
+.tagOrange { background: #fef3c7; color: #d97706; }
+.tagGreen { background: #d1fae5; color: #059669; }
+
+.userBadge {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.85);
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s;
+  z-index: 10;
+}
+.userBadge:hover {
+  background: #fff;
+  box-shadow: var(--shadow-md);
+}
+.userIcon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700;
+}

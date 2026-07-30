@@ -1,0 +1,30 @@
+{
+  "name": "art-shadow",
+  "version": "1.0.0",
+  "description": "参考素材管理软件",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && electron-builder",
+    "preview": "vite preview"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.4",
+    "concurrently": "^10.0.4",
+    "electron": "^31.7.7",
+    "pkg": "^5.8.1",
+    "vite": "^8.1.5",
+    "wait-on": "^9.1.0"
+  },
+  "allowScripts": {
+    "electron@31.7.7": true
+  }
+}

@@ -1,0 +1,101 @@
+.room { position: fixed; inset: 0; display: flex; flex-direction: column; background: #0f1117; color: #e2e8f0; }
+
+.topBar {
+  height: 48px; background: #16181f; border-bottom: 1px solid #1e2130;
+  display: flex; align-items: center; padding: 0 12px; gap: 10px; flex-shrink: 0;
+}
+.backBtn {
+  padding: 5px 12px; border-radius: 6px; border: 1px solid #1e2130;
+  background: transparent; color: #94a3b8; font-size: 12px; cursor: pointer; white-space: nowrap; font-family: inherit;
+}
+.backBtn:hover { background: #1e2130; color: #e2e8f0; }
+.topTitle { font-size: 14px; font-weight: 600; flex-shrink: 0; }
+.topTabs { display: flex; gap: 2px; flex: 1; justify-content: center; }
+.topTab {
+  padding: 6px 16px; border-radius: 6px; border: none;
+  background: transparent; color: #64748b; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.topTabOn { background: #1e2130; color: #e2e8f0; font-weight: 600; }
+.topTab:hover:not(.topTabOn) { color: #e2e8f0; }
+.importBtn {
+  padding: 5px 14px; border-radius: 6px; border: none;
+  background: #6366f1; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.importBtn:hover { background: #4f46e5; }
+.toggleBtn {
+  padding: 4px 8px; border-radius: 4px; border: 1px solid #1e2130;
+  background: transparent; color: #64748b; font-size: 12px; cursor: pointer; font-family: inherit;
+}
+.toggleBtn:hover { background: #1e2130; color: #e2e8f0; }
+
+.body { flex: 1; display: flex; overflow: hidden; }
+
+.leftPanel, .rightPanel {
+  width: 260px; flex-shrink: 0; background: #16181f;
+  border-right: 1px solid #1e2130; display: flex; flex-direction: column;
+}
+.rightPanel { border-right: none; border-left: 1px solid #1e2130; }
+
+.panelTitle {
+  padding: 10px 14px; font-size: 12px; font-weight: 600; color: #94a3b8;
+  border-bottom: 1px solid #1e2130; text-transform: uppercase; letter-spacing: 1px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.addBtn { padding: 2px 8px; border-radius: 4px; border: none; background: #10b981; color: #fff; font-size: 11px; cursor: pointer; font-family: inherit; }
+
+.matList { flex: 1; overflow-y: auto; }
+.matItem {
+  display: flex; align-items: center; gap: 8px; padding: 7px 14px;
+  cursor: pointer; font-size: 12px; color: #94a3b8;
+  border-bottom: 1px solid #1e2130; transition: all 0.12s;
+}
+.matItem:hover { background: #1e2130; color: #e2e8f0; }
+.matActive { background: #1e2130; color: #e2e8f0; font-weight: 600; }
+.matName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matCount { font-size: 10px; color: #64748b; }
+.matDel {
+  width: 20px; height: 20px; border-radius: 50%; border: none;
+  background: none; color: #64748b; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.matDel:hover { background: #3b1c1c; color: #ef4444; }
+
+.centerPanel {
+  flex: 1; display: flex; align-items: flex-start; justify-content: center;
+  background: #0f1117; position: relative; overflow: hidden;
+  padding: 0 40px 40px 40px;
+}
+.centerEmpty { text-align: center; color: #94a3b8; }
+
+.rightContent { flex: 1; overflow-y: auto; }
+
+.emptyTxt { text-align: center; color: #64748b; font-size: 13px; padding: 40px 20px; }
+
+.fbItem {
+  display: flex; align-items: flex-start; gap: 8px; padding: 10px 14px;
+  border-bottom: 1px solid #1e2130; font-size: 12px;
+}
+.fbFrame {
+  padding: 1px 6px; border-radius: 4px;
+  background: #6366f1; color: #fff; font-size: 10px; font-weight: 600; flex-shrink: 0; white-space: nowrap;
+}
+.fbContent { flex: 1; color: #e2e8f0; }
+.fbMeta { font-size: 10px; color: #64748b; flex-shrink: 0; }
+.fbStatus {
+  padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  border: none; cursor: pointer; font-family: inherit; flex-shrink: 0;
+}
+.st待处理 { background: #fef3c7; color: #d97706; }
+.st已处理 { background: #d1fae5; color: #059669; }
+.st讨论中 { background: #dbeafe; color: #3d7abf; }
+.fbDel {
+  width: 18px; height: 18px; border-radius: 50%; border: none;
+  background: none; color: #64748b; cursor: pointer; font-size: 12px;
+}
+.fbDel:hover { background: #3b1c1c; color: #ef4444; }
+
+.verSelect {
+  width: 100%; padding: 8px 10px; border-radius: 6px;
+  border: 1px solid #1e2130; background: #0f1117; color: #e2e8f0;
+  font-size: 12px; margin-bottom: 4px; font-family: inherit;
+}

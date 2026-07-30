@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3d7abf"/>
+      <stop offset="100%" style="stop-color:#2563eb"/>
+    </linearGradient>
+    <linearGradient id="brush" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#93c5fd"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="248" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="240" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+
+  <!-- Film strip -->
+  <rect x="120" y="280" width="272" height="100" rx="8" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+  <rect x="130" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+  <rect x="158" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+  <rect x="186" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+  <rect x="214" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+  <rect x="242" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+  <rect x="270" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+  <rect x="298" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+  <rect x="326" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+  <rect x="354" y="290" width="16" height="80" rx="3" fill="rgba(255,255,255,0.3)"/>
+
+  <!-- Play triangle -->
+  <polygon points="225,300 225,360 270,330" fill="rgba(255,255,255,0.9)"/>
+
+  <!-- Brush/paint stroke - flowing, dynamic -->
+  <path d="M 180 260 Q 200 180 280 150 Q 340 130 360 100 Q 370 85 365 75 Q 360 68 350 72 Q 320 85 300 110 Q 280 140 240 160 Q 190 190 150 240 Q 140 260 160 260 Q 170 260 180 260 Z"
+    fill="url(#brush)" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Brush tip -->
+  <path d="M 345 60 L 355 45 L 365 55 Z" fill="#93c5fd"/>
+
+  <!-- Small sparkle dots suggesting creativity -->
+  <circle cx="380" cy="80" r="8" fill="rgba(255,255,255,0.6)"/>
+  <circle cx="395" cy="130" r="5" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="140" cy="130" r="6" fill="rgba(255,255,255,0.5)"/>
+  <circle cx="110" cy="200" r="4" fill="rgba(255,255,255,0.3)"/>
+
+  <!-- Swordsman/brush stroke crossing motion lines -->
+  <path d="M 100 350 Q 200 310 300 340 Q 350 350 380 330" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 120 370 Q 220 340 320 360 Q 370 368 390 350" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-linecap="round"/>
+</svg>

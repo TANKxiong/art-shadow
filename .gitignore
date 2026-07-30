@@ -1,0 +1,7 @@
+node_modules/
+dist/
+electron.zip
+*.lnk
+画影客-安装包.zip
+.cowork-temp/
+electron-dist/

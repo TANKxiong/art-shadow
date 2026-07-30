@@ -1,0 +1,141 @@
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  width: 560px; max-width: 94vw;
+  max-height: 88vh;
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column;
+}
+.header {
+  padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.header h3 { font-size: 16px; font-weight: 600; }
+.closeBtn {
+  width: 30px; height: 30px; border-radius: 50%; border: none;
+  background: #f1f5f9; cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center; color: var(--text-secondary);
+}
+.closeBtn:hover { background: #fee2e2; color: #ef4444; }
+
+/* Preview area - top half */
+.previewSection {
+  flex: 1; min-height: 0;
+  padding: 16px;
+  background: #0f172a;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px; justify-items: center;
+  width: 100%; height: 100%;
+}
+.previewItem {
+  width: 100%; max-width: 400px; text-align: center;
+  display: flex; flex-direction: column;
+  height: 100%;
+}
+.previewImg, .previewVid {
+  width: 100%; flex: 1; border-radius: 10px;
+  overflow: hidden; background: #1e293b;
+  display: flex; align-items: center; justify-content: center;
+}
+.previewImg img { width: 100%; height: 100%; object-fit: cover; }
+.previewVid { background: #0f172a; }
+.previewVideo { width: 100%; height: 100%; object-fit: cover; } 
+.previewIcon { font-size: 36px; opacity: 0.5; }
+.previewName {
+  font-size: 11px; color: #94a3b8;
+  margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;
+}
+.previewMore {
+  width: 100%; max-width: 400px; border-radius: 10px;
+  flex: 1;
+  background: rgba(91,155,213,0.15); color: #93c5fd;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 600;
+}
+.fileCount {
+  text-align: center; font-size: 14px; color: #94a3b8;
+  margin-top: 10px;
+}
+.fileCount strong { color: #fff; }
+
+/* Selection area - bottom half */
+.catSection {
+  flex: 1; min-height: 0;
+  padding: 16px 20px; overflow-y: auto;
+}
+.catTitle {
+  text-align: center; font-size: 15px; font-weight: 600;
+  color: var(--text); margin-bottom: 10px;
+}
+.breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; margin-bottom: 10px;
+  font-size: 13px; color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.pathText { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.backBtn {
+  padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border);
+  background: #fff; font-size: 12px; cursor: pointer;
+  color: var(--text-secondary); flex-shrink: 0; font-family: inherit;
+}
+.backBtn:hover { background: var(--surface-hover); }
+
+.catGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.catCard {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: #fff; cursor: pointer;
+  transition: all 0.15s;
+}
+.catCard:hover {
+  border-color: var(--primary);
+  background: #dbeafe;
+}
+.catSelected {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.catIcon { font-size: 18px; flex-shrink: 0; }
+.catName {
+  font-size: 13px; color: var(--text); flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.catSelected .catName { color: var(--primary-dark); font-weight: 600; }
+.catCheck {
+  color: var(--primary); font-weight: 700; flex-shrink: 0;
+}
+
+/* Footer */
+.footer {
+  padding: 14px 20px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;
+}
+.cancelBtn {
+  padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border);
+  background: #fff; font-size: 14px; cursor: pointer; color: var(--text-secondary);
+  font-family: inherit;
+}
+.confirmBtn {
+  padding: 8px 20px; border-radius: 8px; border: none;
+  background: var(--primary); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+}
+.confirmBtn:disabled { opacity: 0.5; cursor: default; }
+.confirmBtn:not(:disabled):hover { background: var(--primary-dark); }

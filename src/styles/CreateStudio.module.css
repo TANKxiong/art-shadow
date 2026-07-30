@@ -1,0 +1,195 @@
+.createStudio {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  background: #0f1117;
+  color: #e2e8f0;
+  overflow: hidden;
+}
+
+/* Left toolbar */
+.toolbar {
+  width: 64px;
+  background: #16181f;
+  border-right: 1px solid #1e2130;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.tool {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  position: relative;
+}
+.tool:hover { background: #1e2130; color: #e2e8f0; }
+.toolActive {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+}
+.toolDivider {
+  width: 32px; height: 1px;
+  background: #1e2130;
+  margin: 8px 0;
+}
+
+/* Palette panel */
+.palette {
+  width: 280px;
+  background: #1a1c24;
+  border-right: 1px solid #1e2130;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 20px;
+  gap: 20px;
+  overflow-y: auto;
+}
+.paletteTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.colorGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.colorSwatch {
+  width: 100%; aspect-ratio: 1;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+}
+.colorSwatch:hover { transform: scale(1.1); }
+.colorSwatch.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.2); }
+.colorSwatch.active::after {
+  content: '✓';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 16px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.brushSection { display: flex; flex-direction: column; gap: 8px; }
+.brushSize {
+  width: 100%; height: 4px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+/* Main canvas area */
+.canvasArea {
+  flex: 1;
+  display: flex; flex-direction: column;
+  background: radial-gradient(ellipse at center, #1a1c2e 0%, #0f1117 70%);
+  overflow: hidden;
+}
+.artBoard {
+  width: 100%; flex: 1;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
+  position: relative;
+  margin: 8px;
+}
+.welcomeOverlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 20px;
+  pointer-events: none;
+}
+.welcomeIcon {
+  font-size: 72px;
+  opacity: 0.6;
+}
+.welcomeText {
+  font-size: 18px;
+  color: #64748b;
+  font-weight: 500;
+}
+.welcomeSub {
+  font-size: 13px;
+  color: #475569;
+}
+
+/* Top bar */
+.topBar {
+  height: 52px;
+  background: #16181f;
+  border-bottom: 1px solid #1e2130;
+  display: flex; align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.topTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-right: auto;
+}
+.topBtn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #1e2130;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.topBtn:hover { background: #1e2130; color: #e2e8f0; }
+.topBtnPrimary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  color: #fff;
+}
+.topBtnPrimary:hover { opacity: 0.9; }
+
+/* Layer panel */
+.layerPanel {
+  width: 220px;
+  background: #1a1c24;
+  border-left: 1px solid #1e2130;
+  padding: 16px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.layerItem {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #94a3b8;
+  transition: all 0.15s;
+}
+.layerItem:hover { background: #1e2130; }
+.layerItem.active { background: #1e2130; color: #e2e8f0; }
+.layerThumb {
+  width: 32px; height: 22px;
+  border-radius: 4px;
+  background: #2d2d3f;
+  border: 1px solid #1e2130;
+  flex-shrink: 0;
+}
+.layerName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layerEye { opacity: 0.5; cursor: pointer; }

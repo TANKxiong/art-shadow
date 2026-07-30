@@ -1,0 +1,129 @@
+.topbar {
+  height: var(--topbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.breadcrumb {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.breadcrumb span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.searchBox {
+  flex: 1;
+  max-width: 480px;
+  position: relative;
+}
+
+.searchBox input {
+  width: 100%;
+  padding: 9px 16px 9px 38px;
+  border-radius: 24px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  font-size: 14px;
+  color: var(--text);
+  transition: all 0.2s;
+  outline: none;
+}
+
+.searchBox input:focus {
+  border-color: var(--primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(91, 155, 213, 0.10);
+}
+
+.searchBox input::placeholder {
+  color: var(--text-muted);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 15px;
+  pointer-events: none;
+}
+
+.clearBtn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border);
+  color: var(--text-secondary);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.clearBtn:hover {
+  background: var(--text-muted);
+  color: #fff;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 500;
+}
+
+.btn:hover {
+  background: var(--surface-hover);
+}
+
+.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.homeBtn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.homeBtn:hover { background: var(--surface-hover); }
