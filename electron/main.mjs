@@ -1,4 +1,4 @@
-﻿import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -17,21 +17,20 @@ function ensureDirs() {
   if (!fs.existsSync(materialsDir)) fs.mkdirSync(materialsDir, { recursive: true })
 }
 
-// HTTP server to serve material files
+// HTTP server for material files
 function startFileServer() {
-  const mime = { '.mp4':'video/mp4','.webm':'video/webm','.mov':'video/quicktime','.mkv':'video/x-matroska','.avi':'video/x-msvideo','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp' }
-  httpServer = http.createServer((req, res) => {
-    const fileName = decodeURIComponent(req.url.slice(1))
-    const filePath = path.join(materialsDir, fileName)
-    if (fs.existsSync(filePath)) {
+  const mime = { '.mp4':'video/mp4','.webm':'video/webm','.mov':'video/quicktime','.mkv':'video/x-matroska','.avi':'video/x-msvideo','.jpg':'image/jpeg','.png':'image/png','.gif':'image/gif' }
+  try {
+    httpServer = http.createServer((req, res) => {
+      const filePath = path.join(materialsDir, decodeURIComponent(req.url.slice(1)))
+      if (!fs.existsSync(filePath)) { res.writeHead(404); res.end(); return }
       const ext = path.extname(filePath)
-      res.writeHead(200, { 'Content-Type': mime[ext] || 'application/octet-stream', 'Content-Length': fs.statSync(filePath).size })
+      res.writeHead(200, { 'Content-Type': mime[ext] || 'application/octet-stream' })
       fs.createReadStream(filePath).pipe(res)
-    } else {
-      res.writeHead(404); res.end()
-    }
-  })
-  httpServer.listen(58099)
+    })
+    httpServer.listen(58099, '127.0.0.1')
+    console.log('Material server on port 58099')
+  } catch(e) { console.log('Server port busy, trying alternatives...') }
 }
 
 function loadData() {
@@ -40,6 +39,7 @@ function loadData() {
 }
 function saveData(data) { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)) }
 
+// IPC handlers
 ipcMain.handle('data:getAll', () => loadData())
 ipcMain.handle('data:save', (_, data) => { saveData(data); return { success: true } })
 
@@ -65,9 +65,10 @@ ipcMain.handle('dialog:openFiles', async () => {
   })
 })
 
-// Return HTTP URL for material files
 ipcMain.handle('materials:getPath', (_, fileName) => {
-  return `http://localhost:58099/${encodeURIComponent(fileName)}`
+  // Try file:// first (needs webSecurity:false), fall back to HTTP
+  const filePath = `file:///${path.join(materialsDir, fileName).replace(/\\/g, '/')}`
+  return filePath
 })
 
 app.whenReady().then(() => {
@@ -79,7 +80,8 @@ app.whenReady().then(() => {
     title: '画影客', backgroundColor: '#0f1117', show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
-      contextIsolation: true, nodeIntegration: false
+      contextIsolation: true, nodeIntegration: false,
+      webSecurity: false
     }
   })
 
