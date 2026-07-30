@@ -1,0 +1,15 @@
+{
+  "appId": "com.artshadow.app",
+  "productName": "画影客",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": "portable"
+  }
+}
