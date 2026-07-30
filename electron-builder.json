@@ -1,6 +1,6 @@
 {
   "appId": "com.artshadow.app",
-  "productName": "画影客",
+  "productName": "ArtShadow",
   "directories": {
     "output": "release"
   },
@@ -9,13 +9,13 @@
     "electron/**/*",
     "package.json"
   ],
-  "extraResources": [
-    {
-      "from": "public/",
-      "to": "public/"
-    }
-  ],
   "win": {
-    "target": "portable"
+    "target": "nsis"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": null,
+    "uninstallerIcon": null
   }
 }

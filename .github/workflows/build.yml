@@ -23,5 +23,5 @@ jobs:
           npx electron-builder --win --config=electron-builder.json
       - uses: actions/upload-artifact@v4
         with:
-          name: ArtShadow
+          name: ArtShadow-Installer
           path: release/*.exe
