@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import styles from '../styles/SplashScreen.module.css'
 
 export default function SplashScreen({ onDone }) {
@@ -22,7 +22,7 @@ export default function SplashScreen({ onDone }) {
   return (
     <div className={`${styles.splash} ${fadeOut ? styles.splashFade : ''}`}>
       {!videoError ? (
-        <video className={styles.splashVideo} src="/logo-animation.mp4"
+        <video className={styles.splashVideo} src="./logo-animation.mp4"
           autoPlay muted playsInline
           onError={() => setVideoError(true)}
           onEnded={() => setVideoEnded(true)} />
