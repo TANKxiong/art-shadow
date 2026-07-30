@@ -16,9 +16,12 @@ jobs:
 
       - run: npm install
       - run: npm run build
-      - run: npm install electron@31 electron-builder --save-dev
-      - run: npx electron-builder --win --config=electron-builder.json
+
+      - name: Package
+        run: |
+          npm install electron@31 electron-builder@25 --save-dev
+          npx electron-builder --win --config=electron-builder.json
       - uses: actions/upload-artifact@v4
         with:
-          name: ArtShadow-Portable
+          name: ArtShadow
           path: release/*.exe
