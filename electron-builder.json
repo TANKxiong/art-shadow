@@ -10,12 +10,7 @@
     "package.json"
   ],
   "win": {
-    "target": "nsis"
+    "target": "portable"
   },
-  "nsis": {
-    "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
-    "installerIcon": null,
-    "uninstallerIcon": null
-  }
+  "buildDependenciesFromSource": false,
 }
