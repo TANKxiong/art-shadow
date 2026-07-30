@@ -23,7 +23,7 @@ function FilePreview({ file }) {
 
   return (
     <div className={styles.previewItem}>
-      {file.type.startsWith('video/') ? (
+      {file.type?.startsWith('video/') ? (
         <div className={styles.previewVid}>
           {preview ? (
             <video src={preview} autoPlay muted loop playsInline className={styles.previewVideo}
@@ -37,7 +37,7 @@ function FilePreview({ file }) {
           {preview ? <img src={preview} alt="" /> : <span className={styles.previewIcon}>🖼️</span>}
         </div>
       )}
-      <div className={styles.previewName}>{file.name}</div>
+      <div className={styles.previewName}>{file.name || ''}</div>
     </div>
   )
 }
