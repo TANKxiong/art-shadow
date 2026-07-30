@@ -1,10 +1,12 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
+import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let mainWindow = null
+let httpServer = null
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
 const materialsDir = path.join(dataDir, 'materials')
@@ -15,17 +17,28 @@ function ensureDirs() {
   if (!fs.existsSync(materialsDir)) fs.mkdirSync(materialsDir, { recursive: true })
 }
 
-function loadData() {
-  try {
-    if (fs.existsSync(dbPath)) return JSON.parse(fs.readFileSync(dbPath, 'utf-8'))
-  } catch (e) {}
-  return { categories: [], materials: [], tags: [] }
+// HTTP server to serve material files
+function startFileServer() {
+  const mime = { '.mp4':'video/mp4','.webm':'video/webm','.mov':'video/quicktime','.mkv':'video/x-matroska','.avi':'video/x-msvideo','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp' }
+  httpServer = http.createServer((req, res) => {
+    const fileName = decodeURIComponent(req.url.slice(1))
+    const filePath = path.join(materialsDir, fileName)
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(filePath)
+      res.writeHead(200, { 'Content-Type': mime[ext] || 'application/octet-stream', 'Content-Length': fs.statSync(filePath).size })
+      fs.createReadStream(filePath).pipe(res)
+    } else {
+      res.writeHead(404); res.end()
+    }
+  })
+  httpServer.listen(58099)
 }
 
+function loadData() {
+  try { if (fs.existsSync(dbPath)) return JSON.parse(fs.readFileSync(dbPath, 'utf-8')) } catch (e) {}
+  return { categories: [], materials: [], tags: [] }
+}
 function saveData(data) { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)) }
-
-// Register custom protocol to serve materials
-protocol.registerSchemesAsPrivileged([{ scheme: 'artshadow', privileges: { bypassCSP: true, stream: true, supportFetchAPI: true } }])
 
 ipcMain.handle('data:getAll', () => loadData())
 ipcMain.handle('data:save', (_, data) => { saveData(data); return { success: true } })
@@ -52,23 +65,14 @@ ipcMain.handle('dialog:openFiles', async () => {
   })
 })
 
-// Return custom protocol URL for material files
+// Return HTTP URL for material files
 ipcMain.handle('materials:getPath', (_, fileName) => {
-  return `artshadow://files/${fileName}`
+  return `http://localhost:58099/${encodeURIComponent(fileName)}`
 })
 
 app.whenReady().then(() => {
   ensureDirs()
-
-  // Register protocol handler
-  protocol.handle('artshadow', (request) => {
-    const url = new URL(request.url)
-    if (url.hostname === 'files') {
-      const filePath = path.join(materialsDir, path.basename(url.pathname))
-      return net.fetch('file://' + filePath)
-    }
-    return new Response('Not Found', { status: 404 })
-  })
+  startFileServer()
 
   mainWindow = new BrowserWindow({
     width: 1400, height: 900, minWidth: 900, minHeight: 600,
@@ -84,4 +88,7 @@ app.whenReady().then(() => {
   mainWindow.removeMenu()
 })
 
-app.on('window-all-closed', () => app.quit())
+app.on('window-all-closed', () => {
+  if (httpServer) httpServer.close()
+  app.quit()
+})
