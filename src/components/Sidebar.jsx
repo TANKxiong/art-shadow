@@ -121,6 +121,7 @@ export default function Sidebar() {
   }
 
   const handleImport = async () => {
+    try {
     if (window.electronAPI) {
       const files = await window.electronAPI.openFiles()
       if (files.length > 0) {
@@ -137,6 +138,7 @@ export default function Sidebar() {
       if (files.length > 0) { setPendingFiles(files); setShowImportModal(true) }
     }
     input.click()
+    } catch (e) { console.error('Import error:', e) }
   }
 
   const doImport = async (categoryId, trimRanges = {}) => {
