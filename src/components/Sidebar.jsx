@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+﻿import React, { useState, useMemo } from 'react'
 import { useStore } from '../store/StoreContext'
 import UrlModal from './UrlModal'
 import ImportModal from './ImportModal'
@@ -120,7 +120,7 @@ export default function Sidebar() {
     }
   }
 
-  const handleImport = () => {
+  const handleImport = async () => { if (window.electronAPI) { const files = await window.electronAPI.openFiles(); if (files.length > 0) { setPendingFiles(files); setShowImportModal(true) } return }
     const input = document.createElement('input'); input.type = 'file'; input.multiple = true; input.accept = 'video/*,image/*'
     input.onchange = (e) => {
       const files = Array.from(e.target.files)
