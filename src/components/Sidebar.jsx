@@ -120,40 +120,42 @@ export default function Sidebar() {
     }
   }
 
-  const handleImport = async () => { if (window.electronAPI) { const files = await window.electronAPI.openFiles(); if (files.length > 0) { const normalized = files.map(f => ({ ...f, type: f.type==='video'?'video/mp4':'image/jpeg', name: f.originalName, _isElectron: true })); setPendingFiles(normalized); setShowImportModal(true) } return }
-    const input = document.createElement('input'); input.type = 'file'; input.multiple = true; input.accept = 'video/*,image/*'
-    input.onchange = (e) => {
-      const files = Array.from(e.target.files)
+  const handleImport = async () => {
+    if (window.electronAPI) {
+      const files = await window.electronAPI.openFiles()
       if (files.length > 0) {
-        setPendingFiles(files)
+        const norm = files.map(f => ({ ...f, name: f.originalName, _type: f.type==='video'?'video/mp4':'image/jpeg', _isElectron: true }))
+        setPendingFiles(norm)
         setShowImportModal(true)
       }
+      return
+    }
+    const input = document.createElement('input')
+    input.type = 'file'; input.multiple = true; input.accept = 'video/*,image/*'
+    input.onchange = (e) => {
+      const files = Array.from(e.target.files)
+      if (files.length > 0) { setPendingFiles(files); setShowImportModal(true) }
     }
     input.click()
   }
 
   const doImport = async (categoryId, trimRanges = {}) => {
     if (!pendingFiles) return
-    const imported = []
-    for (const f of pendingFiles) {
-      let file = f
-      if (f.type.startsWith('video/') && trimRanges.startTime !== undefined && trimRanges.endTime !== undefined) {
-        const dur = trimRanges.endTime - trimRanges.startTime
-        if (dur > 0.1 && dur < (f.duration || 999)) {
-          try {
-            const trimmed = await trimVideo(f, trimRanges.startTime, trimRanges.endTime)
-            file = new File([trimmed], f.name.replace(/\.\w+$/, '_trimmed.webm'), { type: 'video/webm' })
-          } catch (e) { console.warn('Trim failed:', e) }
-        }
+    const isEl = pendingFiles[0]?._isElectron
+    const imported = pendingFiles.map(f => {
+      const name = f.originalName || f.name || ''
+      const isVid = /\.(mp4|webm|mov|avi|mkv)$/i.test(name)
+      return {
+        id: f.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        originalName: f.originalName || f.name,
+        fileName: f.fileName || f.name,
+        type: isVid ? 'video' : 'image',
+        size: f.size || 0,
+        categoryId,
+        importedAt: f.importedAt || new Date().toISOString(),
+        _file: isEl ? undefined : f
       }
-      imported.push({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        originalName: f.name, fileName: file.name,
-        type: file.type.startsWith('video/') ? 'video' : 'image',
-        size: file.size, categoryId,
-        importedAt: new Date().toISOString(), _file: file
-      })
-    }
+    })
     dispatch({ type: 'ADD_MATERIALS', payload: imported })
     setPendingFiles(null)
   }
