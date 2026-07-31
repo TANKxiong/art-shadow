@@ -235,6 +235,30 @@ export default function Sidebar() {
       <div className={styles.footer}>
         <button className={styles.importBtn} onClick={handleImport}><span>📁</span> 导入素材</button>
         <button className={styles.linkBtn} onClick={() => setShowUrlModal(true)}><span>🔗</span> 添加链接</button>
+        <button className={styles.linkBtn} onClick={() => {
+          const data = { categories: state.categories, tags: state.tags, materials: state.materials.map(({_file,...r})=>r) }
+          const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+          const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='画影客-数据备份.json'; a.click()
+        }} style={{marginTop:8}}><span>📤</span> 导出数据备份</button>
+        <button className={styles.linkBtn} onClick={() => {
+          const inp = document.createElement('input'); inp.type='file'; inp.accept='.json'
+          inp.onchange = e => {
+            const file = e.target.files[0]
+            if (!file) return
+            const reader = new FileReader()
+            reader.onload = () => {
+              try {
+                const data = JSON.parse(reader.result)
+                if (window.electronAPI) window.electronAPI.saveData(data)
+                else localStorage.setItem('refvault-data', JSON.stringify(data))
+                alert('数据已导入！请刷新页面。')
+                location.reload()
+              } catch(e) { alert('文件格式错误') }
+            }
+            reader.readAsText(file)
+          }
+          inp.click()
+        }} style={{marginTop:8}}><span>📥</span> 导入数据备份</button>
         {window.electronAPI && (
           <button className={styles.linkBtn} onClick={async () => {
             const dir = await window.electronAPI.setMaterialsDir()
