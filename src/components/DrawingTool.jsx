@@ -34,6 +34,7 @@ export default function DrawingTool({ videoRef, currentFrame, fps, enabled, onTo
   const [color, setColor] = useState('#ff4444')
   const [size, setSize] = useState(4)
   const [drawing, setDrawing] = useState(false)
+  const drawingRef = useRef(false)
   const [dirty, setDirty] = useState(0)
   const [onionSkin, setOnionSkin] = useState(false)
   const [selObj, setSelObj] = useState(null)
@@ -53,6 +54,14 @@ export default function DrawingTool({ videoRef, currentFrame, fps, enabled, onTo
   const onionSkinRef = useRef(onionSkin)
   const selObjRef = useRef(selObj)
   const redrawRef = useRef(null)
+  const mousePosRef = useRef({ x: 0, y: 0 })
+  const toolModeRef = useRef(toolMode)
+  const sizeRef = useRef(size)
+  const colorRef = useRef(color)
+  useEffect(() => { toolModeRef.current = toolMode }, [toolMode])
+  useEffect(() => { sizeRef.current = size }, [size])
+  useEffect(() => { colorRef.current = color }, [color])
+  useEffect(() => { drawingRef.current = drawing }, [drawing])
 
   // Get video content area within canvas (accounts for letterboxing)
   const getContentArea = () => {
@@ -96,7 +105,7 @@ export default function DrawingTool({ videoRef, currentFrame, fps, enabled, onTo
   // Derive frame directly from video for save/render consistency
   const getVideoFrame = () => {
     const v = videoRef?.current
-    return v && v.duration ? Math.floor(v.currentTime * fps) : currentFrameRef.current
+    return v && v.duration ? Math.round(v.currentTime * fps) : currentFrameRef.current
   }
 
   const frameKeys = Object.keys(drawingsRef.current).filter(k => k !== '_objects' && !isNaN(Number(k))).map(Number).sort((a,b)=>a-b)
@@ -170,6 +179,29 @@ export default function DrawingTool({ videoRef, currentFrame, fps, enabled, onTo
         } else {
           drawHandles(ctx, sobj)
         }
+      }
+      // Eraser cursor
+      if (toolModeRef.current === 'eraser') {
+        const er = Math.max(8, sizeRef.current * 3)
+        const mp = mousePosRef.current
+        ctx.save()
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5
+        ctx.setLineDash([4, 4])
+        ctx.beginPath(); ctx.arc(mp.x, mp.y, er, 0, Math.PI * 2); ctx.stroke()
+        ctx.setLineDash([])
+        ctx.fillStyle = 'rgba(255,255,255,0.08)'
+        ctx.fill()
+        ctx.restore()
+      }
+      // Shape preview (rectangle, circle, line, arrow)
+      if (shapeRef.current && shapeEndRef.current && ['rect','ellipse','line','arrow'].includes(toolModeRef.current)) {
+        const sx = shapeRef.current.x, sy = shapeRef.current.y
+        const ex = shapeEndRef.current.x, ey = shapeEndRef.current.y
+        ctx.strokeStyle = colorRef.current; ctx.lineWidth = sizeRef.current; ctx.lineCap = 'round'
+        if(toolModeRef.current==='rect') ctx.strokeRect(sx, sy, ex-sx, ey-sy)
+        else if(toolModeRef.current==='ellipse') { ctx.beginPath(); ctx.ellipse((sx+ex)/2, (sy+ey)/2, Math.abs(ex-sx)/2, Math.abs(ey-sy)/2, 0, 0, Math.PI*2); ctx.stroke() }
+        else if(toolModeRef.current==='line') { ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke() }
+        else if(toolModeRef.current==='arrow') { ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke(); const dx=ex-sx,dy=ey-sy,len=Math.hypot(dx,dy); if(len>5) { const nx=dx/len,ny=dy/len,as=10; ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex-nx*as+ny*as*0.4,ey-ny*as-nx*as*0.4); ctx.lineTo(ex-nx*as-ny*as*0.4,ey-ny*as+nx*as*0.4); ctx.closePath(); ctx.fillStyle=colorRef.current; ctx.fill() } }
       }
     }
     redraw()
@@ -314,14 +346,16 @@ export default function DrawingTool({ videoRef, currentFrame, fps, enabled, onTo
   const moveDraw = (e) => {
     if (!enabled) return; e.preventDefault()
     const pos = getPos(e)
-    if (draggingHandle && selObj) {
+        mousePosRef.current = pos
+
+if (draggingHandle && selObj) {
       if (draggingHandle==='scale' && selObj.type==='text') { const cx=selObj.x,cy=selObj.y; const prevD=Math.hypot(dragStart.current.x-cx,dragStart.current.y-cy); const curD=Math.hypot(pos.x-cx,pos.y-cy); updateSelObjParam('size',Math.round(Math.max(4,Math.min(120,dragStart.current.size*(curD/prevD))))) }
       else if(draggingHandle==='rotate'||(draggingHandle==='scale'&&e.shiftKey)) { const p=draggingHandle==='scale'&&e.shiftKey?getOppositeCorner(selObj):{x:selObj.cx,y:selObj.cy}; const pa=Math.atan2(dragStart.current.y-p.y,dragStart.current.x-p.x),ca=Math.atan2(pos.y-p.y,pos.x-p.x); updateSelObjParam('angle',dragStart.current.angle+(ca-pa)) }
       else if(draggingHandle==='scale') { const pd=Math.hypot(dragStart.current.x-selObj.cx,dragStart.current.y-selObj.cy),cd=Math.hypot(pos.x-selObj.cx,pos.y-selObj.cy); updateSelObjParam('scale',Math.max(0.2,Math.min(3,dragStart.current.scale*(cd/pd)))) }; return
     }
     if (draggingMove && selObj) { const kx=selObj.type==='text'?'x':'cx',ky=selObj.type==='text'?'y':'cy'; updateSelObjParam(kx,dragStart.current.cx+pos.x-dragStart.current.x); updateSelObjParam(ky,dragStart.current.cy+pos.y-dragStart.current.y); return }
     if (selObj&&!drawing&&!draggingHandle&&!draggingMove) { const h=hovering(pos.x,pos.y); if(h)setHoveredHandle(h); else if(insideBox(pos.x,pos.y))setHoveredHandle('move'); else setHoveredHandle(null) }
-    if (!drawing) {
+    if (!drawingRef.current) {
       if (toolMode==='eraser') { const c3=canvasRef.current; if(c3){const ctx3=c3.getContext('2d');ctx3.save();ctx3.strokeStyle='#fff';ctx3.lineWidth=1.5;ctx3.setLineDash([4,3]);ctx3.beginPath();ctx3.arc(pos.x,pos.y,Math.max(6,size*3),0,Math.PI*2);ctx3.stroke();ctx3.setLineDash([]);ctx3.restore()} }; return
     }
     if (toolMode==='eraser') { eraseAt(pos.x,pos.y); return }
@@ -371,6 +405,7 @@ export default function DrawingTool({ videoRef, currentFrame, fps, enabled, onTo
 
   useEffect(()=>{if(!selObj)return;const h=(e)=>{if(e.key==='ArrowLeft'){e.preventDefault();updateSelObjParam('angle',(selObj.angle||0)-5*Math.PI/180)};if(e.key==='ArrowRight'){e.preventDefault();updateSelObjParam('angle',(selObj.angle||0)+5*Math.PI/180)};if(e.key==='+'||e.key==='='){e.preventDefault();if(selObj.type==='text')updateSelObjParam('size',(selObj.size||16)+1);else updateSelObjParam('scale',(selObj.scale||1)+0.05)};if(e.key==='-'){e.preventDefault();if(selObj.type==='text')updateSelObjParam('size',Math.max(4,(selObj.size||16)-1));else updateSelObjParam('scale',Math.max(0.2,(selObj.scale||1)-0.05))}};document.addEventListener('keydown',h);return()=>document.removeEventListener('keydown',h)},[selObj,currentFrame])
   useEffect(()=>{if(!enabled)return;const h=(e)=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undoStroke()}};document.addEventListener('keydown',h);return()=>document.removeEventListener('keydown',h)},[enabled,currentFrame])
+  useEffect(()=>{if(!enabled||toolMode!=='eraser')return;const h=(e)=>{e.preventDefault();setSize(s=>Math.max(1,Math.min(20,s+(e.deltaY>0?-1:1))))};document.addEventListener('wheel',h,{passive:false});return()=>document.removeEventListener('wheel',h)},[enabled,toolMode])
 
   if (!enabled) return null
 

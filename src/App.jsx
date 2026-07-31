@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { StoreProvider, useStore } from './store/StoreContext'
-import SplashScreen from './components/SplashScreen'
-import ModuleHome from './components/ModuleHome'
 import LoginModal from './components/LoginModal'
 import CreateStudio from './components/CreateStudio'
 import FeedbackRoom from './components/FeedbackRoom'
+import ModuleHome from './components/ModuleHome'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import MaterialGrid from './components/MaterialGrid'
@@ -21,7 +20,6 @@ export default function App() {
 
 function AppLayout() {
   const [module, setModule] = useState(null)
-  const [showSplash, setShowSplash] = useState(true)
   const [user, setUser] = useState(null)
   const [showLogin, setShowLogin] = useState(false)
 
@@ -32,13 +30,8 @@ function AppLayout() {
   if (!module) {
     return (
       <>
-        {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
-        {!showSplash && (
-        <>
         <ModuleHome onSelect={setModule} user={user} onLoginClick={() => setShowLogin(true)} />
         {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLogin={handleLogin} />}
-        </>
-        )}
       </>
     )
   }

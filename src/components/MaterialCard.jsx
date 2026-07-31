@@ -57,6 +57,10 @@ export default function MaterialCard({ material, selectMode, selected, onToggleS
   const getDisplayName = () => material.displayName || material.originalName || '未命名素材'
 
   useEffect(() => {
+    if (material.thumbnail) setThumbDataUrl(material.thumbnail)
+  }, [material.thumbnail])
+
+  useEffect(() => {
     if (material.type !== 'video' || material.thumbnail || thumbReadyRef.current) return
     if (material._file) setVideoSrc(URL.createObjectURL(material._file))
     else if (material.fileName && window.electronAPI) window.electronAPI.getMaterialPath(material.fileName).then(p => setVideoSrc('file://' + p))

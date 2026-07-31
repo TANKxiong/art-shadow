@@ -25,6 +25,8 @@ export default function PreviewModal() {
   const [timelineDrag, setTimelineDrag] = useState(false)
   const [loop, setLoop] = useState(false)
   const [speed, setSpeed] = useState(1)
+  const [loopRange, setLoopRange] = useState(null)
+  const [loopDrag, setLoopDrag] = useState(null)
   const [editMode, setEditMode] = useState(false)
   const [editName, setEditName] = useState('')
   const [editSource, setEditSource] = useState('')
@@ -145,6 +147,26 @@ export default function PreviewModal() {
     return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
   }, [timelineDrag, videoDur])
 
+  useEffect(() => {
+    if (!loopDrag || !videoDur) return
+    const el = timelineElRef.current
+    if (!el) return
+    const onMove = (e) => {
+      const rect = el.getBoundingClientRect()
+      const t = Math.max(0, Math.min(videoDur, ((e.clientX - rect.left) / rect.width) * videoDur))
+      setLoopRange(prev => {
+        if (!prev) return null
+        if (loopDrag === 'start' && t < prev.end) return { ...prev, start: t }
+        if (loopDrag === 'end' && t > prev.start) return { ...prev, end: t }
+        return prev
+      })
+    }
+    const onUp = () => setLoopDrag(null)
+    document.addEventListener('mousemove', onMove, {passive: true})
+    document.addEventListener('mouseup', onUp)
+    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+  }, [loopDrag, videoDur])
+
   const toggleFullscreen = useCallback(() => {
     const el = contentRef.current
     if (!el) return
@@ -162,6 +184,8 @@ export default function PreviewModal() {
     document.addEventListener('fullscreenchange', onFsChange)
     return () => document.removeEventListener('fullscreenchange', onFsChange)
   }, [])
+
+  useEffect(() => { const lr = loopRange; if (!lr || !playing) return; const v = videoRef.current; if (!v) return; const check = () => { if (v.currentTime >= lr.end) v.currentTime = lr.start }; v.addEventListener('timeupdate', check); return () => v.removeEventListener('timeupdate', check) }, [loopRange, playing])
 
   const onTimeUpdate = useCallback(() => {
     const video = videoRef.current
@@ -209,10 +233,20 @@ export default function PreviewModal() {
         <div className={styles.header}>
           <h3>{previewMaterial.displayName || previewMaterial.originalName || '素材预览'}</h3>
           <div className={styles.headerActions}>
-            {isVideo && (
+            {isVideo && (<>
               <button className={`${styles.drawToggle} ${drawMode ? styles.drawActive : ''}`}
                 onClick={() => { setDrawMode(!drawMode); setEditMode(false) }} title="逐帧画笔 (D)">🖌️ 画笔</button>
-            )}
+              <button className={styles.drawToggle}
+                onClick={() => {
+                  const v = videoRef.current; if (!v) return
+                  const c = document.createElement('canvas')
+                  c.width = v.videoWidth; c.height = v.videoHeight
+                  c.getContext('2d').drawImage(v, 0, 0)
+                  const dataUrl = c.toDataURL('image/jpeg', 0.85)
+                  dispatch({ type: 'UPDATE_MATERIAL', payload: { id: previewMaterial.id, thumbnail: dataUrl } })
+                  const btn = document.activeElement; if (btn) { btn.textContent = '✅'; setTimeout(() => { btn.textContent = '🖼️ 设为封面' }, 800) }
+                }} title="取当前帧为封面">🖼️ 设为封面</button>
+            </>)}
             <button className={`${styles.drawToggle} ${editMode ? styles.drawActive : ''}`}
               onClick={() => { setEditMode(!editMode); setDrawMode(false); if (!editMode) { setEditName(previewMaterial.displayName || previewMaterial.originalName || ''); setEditSource(previewMaterial.source || ''); setEditCat(previewMaterial.categoryId || '') } }} title="编辑信息">✏️ 编辑</button>
             <button className={styles.closeBtn} onClick={close}>✕</button>
@@ -311,6 +345,24 @@ export default function PreviewModal() {
                         style={{left: (i/totalFrames*100)+'%'}} />
                     )
                   })}
+                  {loopRange && loopRange.end > loopRange.start && (
+                    <div className={styles.loopRangeBg} style={{
+                      left: (loopRange.start/videoDur*100)+'%',
+                      width: ((loopRange.end-loopRange.start)/videoDur*100)+'%'
+                    }} />
+                  )}
+                  {loopRange && (<>
+                    <div className={styles.loopMarker}
+                      style={{left:(loopRange.start/videoDur*100)+'%'}}
+                      onMouseDown={e=>{e.stopPropagation();e.preventDefault();setLoopDrag('start')}}>
+                      <div className={styles.loopHandle} />
+                    </div>
+                    <div className={styles.loopMarker}
+                      style={{left:(loopRange.end/videoDur*100)+'%'}}
+                      onMouseDown={e=>{e.stopPropagation();e.preventDefault();setLoopDrag('end')}}>
+                      <div className={styles.loopHandle} />
+                    </div>
+                  </>)}
                   <div className={styles.timelineFill}
                     style={{width: videoDur ? (videoTime/videoDur*100)+'%' : '0%'}} />
                   <div className={styles.timelineThumb}
