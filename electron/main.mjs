@@ -10,6 +10,11 @@ let httpServer = null
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
 const materialsDir = path.join(dataDir, 'materials')
+let materialsDir = path.join(dataDir, 'materials')
+// Load custom materials path from config
+const configPath = path.join(dataDir, 'config.json')
+try { if (fs.existsSync(configPath)) { const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8')); if (cfg.materialsDir) materialsDir = cfg.materialsDir } } catch(e) {}
+
 const dbPath = path.join(dataDir, 'data.json')
 
 function ensureDirs() {
@@ -69,6 +74,20 @@ ipcMain.handle('materials:getPath', (_, fileName) => {
   // Try file:// first (needs webSecurity:false), fall back to HTTP
   const filePath = `file:///${path.join(materialsDir, fileName).replace(/\\/g, '/')}`
   return filePath
+})
+
+ipcMain.handle('settings:getMaterialsDir', () => materialsDir)
+ipcMain.handle('settings:setMaterialsDir', async () => {
+  const r = await dialog.showOpenDialog(mainWindow, { title: '选择素材存放文件夹', properties: ['openDirectory'] })
+  if (!r.canceled && r.filePaths.length > 0) {
+    const newDir = r.filePaths[0]
+    if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true })
+    materialsDir = newDir
+    ensureDirs()
+    fs.writeFileSync(configPath, JSON.stringify({ materialsDir: newDir }))
+    return newDir
+  }
+  return null
 })
 
 app.whenReady().then(() => {

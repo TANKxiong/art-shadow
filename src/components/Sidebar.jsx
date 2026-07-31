@@ -235,6 +235,12 @@ export default function Sidebar() {
       <div className={styles.footer}>
         <button className={styles.importBtn} onClick={handleImport}><span>📁</span> 导入素材</button>
         <button className={styles.linkBtn} onClick={() => setShowUrlModal(true)}><span>🔗</span> 添加链接</button>
+        {window.electronAPI && (
+          <button className={styles.linkBtn} onClick={async () => {
+            const dir = await window.electronAPI.setMaterialsDir()
+            if (dir) alert('素材存放路径已改为：\n' + dir)
+          }} style={{marginTop:8}}><span>⚙️</span> 修改存放路径</button>
+        )}
       </div>
       {showImportModal && <ImportModal files={pendingFiles} onClose={() => { setShowImportModal(false); setPendingFiles(null) }} onImport={doImport} />}
       {showUrlModal && <UrlModal onClose={() => setShowUrlModal(false)} onImport={(catId, data) => {
