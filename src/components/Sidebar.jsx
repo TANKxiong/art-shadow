@@ -146,23 +146,41 @@ export default function Sidebar() {
     input.click()
   }
 
-  const doImport = (categoryId, trimRanges = {}) => {
+  const doImport = async (categoryId, trimRanges = {}) => {
     if (!pendingFiles) return
     const isEl = pendingFiles[0]?._isElectron
-    const imported = pendingFiles.map(f => {
+    const hasTrim = trimRanges.startTime != null && trimRanges.endTime != null && trimRanges.startTime < trimRanges.endTime
+    
+    const imported = await Promise.all(pendingFiles.map(async f => {
       const name = f.originalName || f.name || ''
       const isVid = /\.(mp4|webm|mov|avi|mkv)$/i.test(name)
+      let fileName = f.fileName || name
+      let size = f.size || 0
+      
+      // Electron video trimming
+      if (isEl && hasTrim && isVid && window.electronAPI) {
+        try {
+          const p = await window.electronAPI.getMaterialPath(fileName)
+          const rawPath = p.replace('file:///', '').replace(/\//g, '\\')
+          const result = await window.electronAPI.trimVideo(rawPath, trimRanges.startTime, trimRanges.endTime)
+          if (result) {
+            fileName = result.fileName
+            size = 0 // will be updated on play
+          }
+        } catch(e) { console.error('Trim failed:', e) }
+      }
+      
       return {
         id: f.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
         originalName: name,
-        fileName: f.fileName || name,
+        fileName,
         type: isVid ? 'video' : 'image',
-        size: f.size || 0,
+        size,
         categoryId,
         importedAt: f.importedAt || new Date().toISOString(),
         _file: isEl ? undefined : f
       }
-    })
+    }))
     dispatch({ type: 'ADD_MATERIALS', payload: imported })
     setPendingFiles(null)
   }

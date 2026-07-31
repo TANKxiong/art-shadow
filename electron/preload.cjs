@@ -6,5 +6,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
   getMaterialPath: (fileName) => ipcRenderer.invoke('materials:getPath', fileName),
   getMaterialsDir: () => ipcRenderer.invoke('settings:getMaterialsDir'),
-  setMaterialsDir: () => ipcRenderer.invoke('settings:setMaterialsDir')
+  setMaterialsDir: () => ipcRenderer.invoke('settings:setMaterialsDir'),
+  trimVideo: (filePath, startTime, endTime) => ipcRenderer.invoke('dialog:trimVideo', filePath, startTime, endTime)
 })

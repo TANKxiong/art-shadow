@@ -135,6 +135,23 @@ ipcMain.handle('settings:setMaterialsDir', async () => {
   return null
 })
 
+ipcMain.handle('dialog:trimVideo', async (_, filePath, startTime, endTime) => {
+  if (!ffmpegPath) return null
+  const ext = path.extname(filePath)
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  const destPath = path.join(materialsDir, id + '.mp4')
+  const duration = endTime - startTime
+  return new Promise((resolve) => {
+    const args = ['-ss', String(startTime), '-i', filePath, '-t', String(duration), '-c:v', 'libx264', '-c:a', 'aac', '-y', destPath]
+    const proc = spawn(ffmpegPath, args)
+    proc.on('close', (code) => {
+      if (code === 0 && fs.existsSync(destPath)) resolve({ fileName: id + '.mp4', filePath: destPath })
+      else resolve(null)
+    })
+    proc.on('error', () => resolve(null))
+  })
+})
+
 app.whenReady().then(() => {
   ensureDirs()
   startFileServer()
