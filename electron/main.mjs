@@ -1,12 +1,19 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+﻿import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import http from 'node:http'
+import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let mainWindow = null
 let httpServer = null
+import { createRequire } from 'node:module'
+const _require = createRequire(import.meta.url)
+
+// Resolve FFmpeg path
+const ffmpegInstaller = (() => { try { return _require('@ffmpeg-installer/ffmpeg') } catch(e) { return null } })()
+ffmpegPath = ffmpegInstaller?.path || 'ffmpeg'
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
 let materialsDir = path.join(dataDir, 'materials')
@@ -19,6 +26,22 @@ const dbPath = path.join(dataDir, 'data.json')
 function ensureDirs() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true })
   if (!fs.existsSync(materialsDir)) fs.mkdirSync(materialsDir, { recursive: true })
+}
+
+// Transcode video to H.264 MP4 for compatibility
+function transcode(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    execFile(ffmpegPath, [
+      '-y', '-i', inputPath,
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+      outputPath
+    ], { timeout: 120000 }, (err) => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
 }
 
 // HTTP server for material files
@@ -49,24 +72,46 @@ ipcMain.handle('data:save', (_, data) => { saveData(data); return { success: tru
 
 ipcMain.handle('dialog:openFiles', async () => {
   const r = await dialog.showOpenDialog(mainWindow, {
-    title: '导入素材', filters: [{ name: '媒体文件', extensions: ['mp4','webm','mov','avi','mkv','jpg','jpeg','png','gif','webp','bmp'] }],
+    title: '导入素材', filters: [{ name: '媒体文件', extensions: ['mp4','webm','mov','avi','mkv','wmv','flv','m4v','jpg','jpeg','png','gif','webp','bmp'] }],
     properties: ['openFile', 'multiSelections']
   })
   if (r.canceled) return []
   ensureDirs()
-  return r.filePaths.map(fp => {
+  const results = []
+  for (const fp of r.filePaths) {
     const ext = path.extname(fp).toLowerCase()
+    const isVideo = ['.mp4','.webm','.mov','.avi','.mkv','.wmv','.flv','.m4v'].includes(ext)
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
-    const newName = id + ext
-    const dest = path.join(materialsDir, newName)
-    fs.copyFileSync(fp, dest)
-    return {
-      id, originalName: path.basename(fp), fileName: newName,
-      type: ['.mp4','.webm','.mov','.avi','.mkv'].includes(ext) ? 'video' : 'image',
-      size: fs.statSync(dest).size, categoryId: null, tags: [], source: '', notes: '',
-      importedAt: new Date().toISOString()
+    let destPath = fp
+    let newName = path.basename(fp)
+    // For videos, try to ensure playability with FFmpeg
+    if (isVideo && ffmpegPath) {
+      const dest = path.join(materialsDir, id + '.mp4')
+      try {
+        await transcode(fp, dest)
+        destPath = dest
+        newName = id + '.mp4'
+      } catch(e) {
+        // Transcode failed, copy original
+        const dest2 = path.join(materialsDir, id + ext)
+        fs.copyFileSync(fp, dest2)
+        destPath = dest2
+        newName = id + ext
+      }
+    } else {
+      const dest = path.join(materialsDir, id + ext)
+      fs.copyFileSync(fp, dest)
+      destPath = dest
+      newName = id + ext
     }
-  })
+    results.push({
+      id, originalName: path.basename(fp), fileName: newName,
+      type: isVideo ? 'video' : 'image',
+      size: fs.statSync(destPath).size, categoryId: null, tags: [], source: '', notes: '',
+      importedAt: new Date().toISOString()
+    })
+  }
+  return results
 })
 
 ipcMain.handle('materials:getPath', (_, fileName) => {
