@@ -38,7 +38,7 @@ function VideoThumbnail({ videoSrc, onThumbnailReady }) {
     video.addEventListener('seeked', onSeeked)
     return () => { cancelled = true; video.removeEventListener('loadeddata', onData); video.removeEventListener('seeked', onSeeked) }
   }, [videoSrc])
-  return (<><video ref={videoRef} src={videoSrc} crossOrigin="anonymous" preload="metadata" style={{display:'none'}} muted /><canvas ref={canvasRef} style={{display:'none'}} /></>)
+  return (<><video ref={videoRef} src={videoSrc} preload="metadata" style={{display:'none'}} muted /><canvas ref={canvasRef} style={{display:'none'}} /></>)
 }
 
 export default function MaterialCard({ material, selectMode, selected, onToggleSelect }) {
