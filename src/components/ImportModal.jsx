@@ -6,15 +6,21 @@ import styles from '../styles/ImportModal.module.css'
 function FilePreview({ file }) {
   const [preview, setPreview] = useState(null)
   const [thumbLoaded, setThumbLoaded] = useState(false)
+  const isElectron = file._isElectron
 
   useEffect(() => {
     if (!file) return
-    if (file._type?.startsWith('image/') || file.type?.startsWith('image/') || file.type === 'image') {
+    // Electron files are already on disk - no need for object URL
+    if (isElectron) {
+      setPreview(null)
+      return
+    }
+    if (file.type?.startsWith('video/')) {
       const url = URL.createObjectURL(file)
       setPreview(url)
       return () => URL.revokeObjectURL(url)
     }
-    if (file._type?.startsWith('video/') || file.type?.startsWith('video/') || file.type === 'video') {
+    if (file.type?.startsWith('image/')) {
       const url = URL.createObjectURL(file)
       setPreview(url)
       return () => URL.revokeObjectURL(url)
@@ -49,7 +55,8 @@ export default function ImportModal({ files, onClose, onImport }) {
   const [trimRanges, setTrimRanges] = useState({})
   const [step, setStep] = useState(2) // Start at category selection
 
-  const videoFile = files?.find(f => f.type.startsWith('video/'))
+  const isElectron = files?.[0]?._isElectron
+  const videoFile = isElectron ? null : files?.find(f => f.type?.startsWith('video/'))
 
   const getPath = (catId) => {
     const path = []
@@ -124,7 +131,18 @@ export default function ImportModal({ files, onClose, onImport }) {
           ) : (
             <>
             <div className={styles.previewGrid}>
-              {files?.slice(0, 6).map((f, i) => (<FilePreview key={i} file={f} />))}
+              {files?.slice(0, 6).map((f, i) => (
+                isElectron ? (
+                  <div key={i} className={styles.previewItem}>
+                    <div className={f.type?.startsWith('video/') ? styles.previewVid : styles.previewImg}>
+                      <span className={styles.previewIcon}>{f.type?.startsWith('video/') ? '🎬' : '🖼️'}</span>
+                    </div>
+                    <div className={styles.previewName}>{f.originalName || f.name || ''}</div>
+                  </div>
+                ) : (
+                  <FilePreview key={i} file={f} />
+                )
+              ))}
               {files && files.length > 6 && (
                 <div className={styles.previewMore}>+{files.length - 6} 个文件</div>
               )}
