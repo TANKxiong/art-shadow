@@ -4,16 +4,16 @@ import fs from 'node:fs'
 import http from 'node:http'
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 
+const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let mainWindow = null
 let httpServer = null
-import { createRequire } from 'node:module'
-const _require = createRequire(import.meta.url)
 
-// Resolve FFmpeg path
-const ffmpegInstaller = (() => { try { return _require('@ffmpeg-installer/ffmpeg') } catch(e) { return null } })()
-ffmpegPath = ffmpegInstaller?.path || 'ffmpeg'
+// Try to load FFmpeg, silently fall back if not available
+let ffmpegPath = null
+try { ffmpegPath = require('@ffmpeg-installer/ffmpeg').path } catch(e) {}
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
 let materialsDir = path.join(dataDir, 'materials')
@@ -30,6 +30,7 @@ function ensureDirs() {
 
 // Transcode video to H.264 MP4 for compatibility
 function transcode(inputPath, outputPath) {
+  if (!ffmpegPath) return Promise.reject(new Error('FFmpeg not available'))
   return new Promise((resolve, reject) => {
     execFile(ffmpegPath, [
       '-y', '-i', inputPath,
