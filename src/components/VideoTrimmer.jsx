@@ -13,7 +13,17 @@ export default function VideoTrimmer({ file, onTrimChange }) {
 
   useEffect(() => {
     if (!file) return
-    const url = URL.createObjectURL(file)
+    let url
+    if (file._isElectron) {
+      // Electron: use HTTP server or file:// protocol
+      if (window.electronAPI) {
+        window.electronAPI.getMaterialPath(file.fileName).then(p => {
+          setVideoUrl(p)
+        })
+      }
+      return
+    }
+    url = URL.createObjectURL(file)
     setVideoUrl(url)
     return () => URL.revokeObjectURL(url)
   }, [file])

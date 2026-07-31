@@ -58,7 +58,7 @@ export default function ImportModal({ files, onClose, onImport }) {
   const [step, setStep] = useState(2) // Start at category selection
 
   const isElectron = files?.[0]?._isElectron
-  const videoFile = isElectron ? null : files?.find(f => f.type?.startsWith('video/'))
+  const videoFile = files?.find(f => f.type?.startsWith('video/') || f.type === 'video')
 
   const getPath = (catId) => {
     const path = []
