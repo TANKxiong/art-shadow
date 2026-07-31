@@ -9,7 +9,6 @@ let mainWindow = null
 let httpServer = null
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
-const materialsDir = path.join(dataDir, 'materials')
 let materialsDir = path.join(dataDir, 'materials')
 // Load custom materials path from config
 const configPath = path.join(dataDir, 'config.json')
