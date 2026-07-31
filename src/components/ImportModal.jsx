@@ -10,9 +10,11 @@ function FilePreview({ file }) {
 
   useEffect(() => {
     if (!file) return
-    // Electron files are already on disk - no need for object URL
     if (isElectron) {
-      setPreview(null)
+      // Load Electron file via its disk path
+      if (window.electronAPI && file.fileName) {
+        window.electronAPI.getMaterialPath(file.fileName).then(setPreview)
+      }
       return
     }
     if (file.type?.startsWith('video/')) {
@@ -133,12 +135,7 @@ export default function ImportModal({ files, onClose, onImport }) {
             <div className={styles.previewGrid}>
               {files?.slice(0, 6).map((f, i) => (
                 isElectron ? (
-                  <div key={i} className={styles.previewItem}>
-                    <div className={f.type?.startsWith('video/') ? styles.previewVid : styles.previewImg}>
-                      <span className={styles.previewIcon}>{f.type?.startsWith('video/') ? '🎬' : '🖼️'}</span>
-                    </div>
-                    <div className={styles.previewName}>{f.originalName || f.name || ''}</div>
-                  </div>
+                  <FilePreview key={i} file={f} />
                 ) : (
                   <FilePreview key={i} file={f} />
                 )
