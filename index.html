@@ -7,6 +7,11 @@
 </head>
 <body>
   <div id="root"></div>
+  <script>
+    window.onerror = function(msg, url, line) {
+      document.getElementById('root').innerHTML = '<div style="padding:40px;font-family:sans-serif;color:red"><h3>错误</h3><pre>'+msg+'\n行:'+line+'</pre></div>'
+    }
+  </script>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
