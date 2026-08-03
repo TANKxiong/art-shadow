@@ -13,7 +13,14 @@ let httpServer = null
 
 // Try to load FFmpeg, silently fall back if not available
 let ffmpegPath = null
-try { ffmpegPath = require('@ffmpeg-installer/ffmpeg').path } catch(e) {}
+try {
+  ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
+  // In packaged app, binary must be unpacked outside asar archive
+  if (ffmpegPath.includes('app.asar') && !fs.existsSync(ffmpegPath)) {
+    const unpacked = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
+    if (fs.existsSync(unpacked)) ffmpegPath = unpacked
+  }
+} catch(e) { console.error('FFmpeg load failed:', e) }
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
 let materialsDir = path.join(dataDir, 'materials')
@@ -136,19 +143,21 @@ ipcMain.handle('settings:setMaterialsDir', async () => {
 })
 
 ipcMain.handle('dialog:trimVideo', async (_, filePath, startTime, endTime) => {
-  if (!ffmpegPath) return null
-  const ext = path.extname(filePath)
+  if (!ffmpegPath) return { error: 'FFmpeg 不可用，无法裁剪' }
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   const destPath = path.join(materialsDir, id + '.mp4')
   const duration = endTime - startTime
+  if (duration <= 0) return { error: '裁剪区间无效' }
   return new Promise((resolve) => {
-    const args = ['-ss', String(startTime), '-i', filePath, '-t', String(duration), '-c:v', 'libx264', '-c:a', 'aac', '-y', destPath]
+    const args = ['-y', '-ss', String(startTime), '-i', filePath, '-t', String(duration), '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'aac', '-b:a', '128k', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', destPath]
     const proc = spawn(ffmpegPath, args)
+    let stderr = ''
+    proc.stderr.on('data', d => stderr += d)
     proc.on('close', (code) => {
       if (code === 0 && fs.existsSync(destPath)) resolve({ fileName: id + '.mp4', filePath: destPath })
-      else resolve(null)
+      else resolve({ error: 'FFmpeg 裁剪失败 (code ' + code + ')' + (stderr ? ': ' + stderr.slice(-200) : '') })
     })
-    proc.on('error', () => resolve(null))
+    proc.on('error', (err) => resolve({ error: 'FFmpeg 执行失败: ' + err.message }))
   })
 })
 

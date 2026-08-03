@@ -163,11 +163,13 @@ export default function Sidebar() {
           const p = await window.electronAPI.getMaterialPath(fileName)
           const rawPath = p.replace('file:///', '').replace(/\//g, '\\')
           const result = await window.electronAPI.trimVideo(rawPath, trimRanges.startTime, trimRanges.endTime)
-          if (result) {
+          if (result && !result.error && result.fileName) {
             fileName = result.fileName
             size = 0 // will be updated on play
+          } else if (result && result.error) {
+            alert('视频裁剪失败：' + result.error)
           }
-        } catch(e) { console.error('Trim failed:', e) }
+        } catch(e) { console.error('Trim failed:', e); alert('视频裁剪出错：' + (e.message || e)) }
       }
       
       return {
