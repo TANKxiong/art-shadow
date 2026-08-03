@@ -29,7 +29,6 @@ try {
   }
   console.log('FFmpeg path:', ffmpegPath || 'NOT FOUND')
 } catch(e) { console.error('FFmpeg load failed:', e) }
-} catch(e) { console.error('FFmpeg load failed:', e) }
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
 let materialsDir = path.join(dataDir, 'materials')
