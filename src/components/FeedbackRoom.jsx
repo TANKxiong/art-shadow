@@ -196,6 +196,7 @@ export default function FeedbackRoom({ onBack }) {
   const [vcLoop, setVcLoop] = useState(false)
   const [vcLoopStart, setVcLoopStart] = useState(0)
   const [vcMouse, setVcMouse] = useState(null)
+  const [vcDownloading, setVcDownloading] = useState(false)
   const vcCanvasRef = useRef(null)
   const vcDrawingRef = useRef(false)
   const vcLastPosRef = useRef(null)
@@ -727,6 +728,161 @@ export default function FeedbackRoom({ onBack }) {
     vcDirtyRef.current = true
     vcRender()
   }
+
+  // Download: composite video(s) + per-frame drawings into a new video (WebM)
+  // Uses source resolution for sharp output + native captureStream auto-sampling for smoothness
+  const vcDownload = async () => {
+    const va = vaRef.current, vb = vbRef.current
+    if (!va || !vb || vcDownloading) return
+    // Use original video resolution (no quality loss)
+    const vw = va.videoWidth || 1280, vh = va.videoHeight || 720
+    const bw = vb.videoWidth || vw, bh = vb.videoHeight || vh
+    let W = vw, H = vh
+    if (vcMode === 'side') { W = vw * 2; H = vh }
+    else if (vcMode === 'stack') { W = vw; H = vh * 2 }
+    else if (vcMode === 'overlay') { W = Math.max(vw, bw); H = Math.max(vh, bh) }
+    // Cap extremely large canvases for practical recording
+    const MAX = 3840
+    if (W > MAX || H > MAX) {
+      const s = Math.min(MAX / W, MAX / H)
+      W = Math.round(W * s); H = Math.round(H * s)
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = W; canvas.height = H
+    const ctx = canvas.getContext('2d')
+
+    // Stroke coords are in display-space (screen canvas CSS px); map them to output canvas
+    const srcCanvas = vcCanvasRef.current
+    const dispRect = srcCanvas ? srcCanvas.getBoundingClientRect() : { width: W, height: H }
+    const sx = W / Math.max(1, dispRect.width)
+    const sy = H / Math.max(1, dispRect.height)
+
+    const drawContain = (video, dx, dy, dw, dh) => {
+      const vwd = video.videoWidth || 1, vhd = video.videoHeight || 1
+      const s = Math.min(dw / vwd, dh / vhd)
+      const w = vwd * s, h = vhd * s
+      ctx.drawImage(video, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h)
+    }
+    const drawFrame = (fn) => {
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H)
+      if (vcMode === 'side') {
+        drawContain(va, 0, 0, W / 2, H)
+        drawContain(vb, W / 2, 0, W / 2, H)
+      } else if (vcMode === 'stack') {
+        drawContain(va, 0, 0, W, H / 2)
+        drawContain(vb, 0, H / 2, W, H / 2)
+      } else if (vcMode === 'overlay') {
+        ctx.save(); ctx.globalAlpha = vaOpacity; drawContain(va, 0, 0, W, H); ctx.restore()
+        ctx.save(); ctx.globalAlpha = vbOpacity; drawContain(vb, 0, 0, W, H); ctx.restore()
+      } else {
+        drawContain(va, 0, 0, W, H)
+      }
+      // Draw strokes in display-space, scaled to output canvas
+      ctx.save()
+      ctx.scale(sx, sy)
+      vcGetStrokes(fn).forEach(st => vcPaintStroke(ctx, st))
+      ctx.restore()
+    }
+
+    const maxDur = Math.max(va.duration || 0, vb.duration || 0)
+    if (maxDur <= 0) { alert('视频未加载完成，无法下载'); return }
+    const fps = Math.max(1, Math.min(60, vcFps || 30))
+
+    // Prefer MP4 (H.264) for wide compatibility; fall back to WebM on older engines
+    let stream, rec
+    try {
+      stream = canvas.captureStream(fps)
+      const candidates = [
+        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+        'video/mp4',
+        'video/webm;codecs=vp9',
+        'video/webm'
+      ]
+      const highBitrate = { videoBitsPerSecond: 20_000_000 } // 20 Mbps: sharp but fast to encode
+      const mime = candidates.find(m => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m))
+      rec = new MediaRecorder(stream, { mimeType: mime, ...highBitrate })
+    } catch(e) { alert('当前环境不支持视频录制'); return }
+    const chunks = []
+    rec.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data) }
+    rec.onstop = () => {
+      setVcDownloading(false)
+      const isMp4 = (rec.mimeType || '').includes('mp4')
+      const blob = new Blob(chunks, { type: rec.mimeType || 'video/webm' })
+      if (blob.size === 0) { alert('录制失败（无数据）'); return }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = '画影客对比_' + (matA.displayName||matA.originalName||'A') + '_' + (matB.displayName||matB.originalName||'B') + '_' + Date.now() + (isMp4 ? '.mp4' : '.webm')
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+    }
+
+    setVcPlaying(false)
+    setVcDownloading(true)
+    va.muted = true; vb.muted = true
+    va.pause(); vb.pause()
+    // Seek to start and wait for the first frame to actually render
+    await new Promise(res => {
+      let done = false
+      const finish = () => { if (!done) { done = true; res() } }
+      va.onseeked = finish; vb.onseeked = finish
+      try { va.currentTime = 0; vb.currentTime = 0 } catch(e) { finish() }
+      setTimeout(finish, 300)
+    })
+    // Wait one rAF so the first frame is painted, then draw frame 0 before recording starts
+    // Also ensure video frames are actually decodable before we draw
+    await new Promise(res => {
+      let done = false
+      const finish = () => { if (!done) { done = true; res() } }
+      const wait = () => {
+        const ok = (va.readyState >= 2 || va.videoWidth > 0) && (vb.readyState >= 2 || vb.videoWidth > 0)
+        if (ok || tries > 40) finish()
+        else { tries++; requestAnimationFrame(wait) }
+      }
+      let tries = 0
+      requestAnimationFrame(wait)
+      setTimeout(finish, 800)
+    })
+    drawFrame(0)
+
+    rec.start(500) // timeslice flushes data periodically
+    va.play().catch(()=>{}); vb.play().catch(()=>{})
+
+    // Draw exactly once per video frame via requestVideoFrameCallback (perfect sync),
+    // with an independent watchdog timer that guarantees rec.stop() runs even if
+    // the video element never fires another frame callback (e.g. ended/edge cases).
+    let stopped = false
+    const drawTick = () => {
+      if (stopped) return
+      const t = va.currentTime || 0
+      // keep vb in sync with va
+      try {
+        const vbT = vb.currentTime || 0
+        if (Math.abs(vbT - t) > 0.08) vb.currentTime = Math.min(t, vb.duration || t)
+      } catch(e) {}
+      drawFrame(Math.round(t * fps))
+      if (t >= maxDur - 0.05 || va.ended) {
+        stopped = true
+        setTimeout(() => { try { rec.stop() } catch(e) {} }, 200)
+        return
+      }
+      if (typeof va.requestVideoFrameCallback === 'function') {
+        va.requestVideoFrameCallback(drawTick)
+      } else {
+        setTimeout(drawTick, 1000 / fps)
+      }
+    }
+    if (typeof va.requestVideoFrameCallback === 'function') va.requestVideoFrameCallback(drawTick)
+    else setTimeout(drawTick, 1000 / fps)
+
+    // Watchdog: always stop shortly after expected duration
+    setTimeout(() => {
+      if (!stopped) {
+        stopped = true
+        setTimeout(() => { try { rec.stop() } catch(e) {} }, 200)
+      }
+    }, (maxDur + 4) * 1000)
+  }
   const vcWheel = (e) => {
     if (!vcDraw || vcTool !== 'eraser') return
     e.preventDefault()
@@ -941,6 +1097,9 @@ export default function FeedbackRoom({ onBack }) {
                   <div className={styles.vcControls}>
                     <button className={styles.vcBtn} onClick={()=>setVcPlaying(!vcPlaying)}>
                       {vcPlaying ? '⏸ 暂停' : '▶ 播放'}
+                    </button>
+                    <button className={`${styles.vcFrameBtn} ${vcDownloading?styles.vcLoopOn:''}`} onClick={vcDownload} title="下载合成视频（含涂鸦）">
+                      {vcDownloading ? '⏳ 录制中…' : '⬇️ 下载'}
                     </button>
                     <button className={styles.vcFrameBtn} onClick={()=>stepVc(-1)} title="上一帧">⏮</button>
                     <button className={styles.vcFrameBtn} onClick={()=>stepVc(1)} title="下一帧">⏭</button>

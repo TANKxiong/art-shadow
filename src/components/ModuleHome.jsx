@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import styles from '../styles/ModuleHome.module.css'
 
 const MODULES = [
@@ -70,6 +70,19 @@ const CHANGELOG = [
 
 export default function ModuleHome({ onSelect, user, onLoginClick }) {
   const [showLog, setShowLog] = useState(false)
+  // Auto-show changelog when app version is newer than last seen version
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem('artshadow-seen-version')
+      if (seen !== APP_VERSION) {
+        setShowLog(true)
+      }
+    } catch(e) {}
+  }, [])
+  const closeLog = () => {
+    setShowLog(false)
+    try { localStorage.setItem('artshadow-seen-version', APP_VERSION) } catch(e) {}
+  }
   return (
     <div className={styles.moduleHome}>
       {user ? (
@@ -103,11 +116,11 @@ export default function ModuleHome({ onSelect, user, onLoginClick }) {
         ))}
       </div>
       {showLog && (
-        <div className={styles.logMask} onClick={()=>setShowLog(false)}>
+        <div className={styles.logMask} onClick={closeLog}>
           <div className={styles.logPanel} onClick={e=>e.stopPropagation()}>
             <div className={styles.logHeader}>
               <span>📢 更新公告</span>
-              <button className={styles.logClose} onClick={()=>setShowLog(false)}>×</button>
+              <button className={styles.logClose} onClick={closeLog}>×</button>
             </div>
             <div className={styles.logBody}>
               {CHANGELOG.map(log => (
