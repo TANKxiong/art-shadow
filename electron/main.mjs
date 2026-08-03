@@ -1,5 +1,6 @@
 ﻿import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
+import os from 'node:os'
 import fs from 'node:fs'
 import http from 'node:http'
 import { execFile, spawn } from 'node:child_process'
@@ -178,6 +179,49 @@ ipcMain.handle('dialog:trimVideo', async (_, filePath, startTime, endTime) => {
     })
     proc.on('error', (err) => resolve({ error: 'FFmpeg 执行失败: ' + err.message }))
   })
+})
+
+// Export: receive per-frame JPEG data URLs, encode to MP4 with FFmpeg, then ask user where to save
+ipcMain.handle('export:frames', async (_, { frames, fps }) => {
+  if (!ffmpegPath) return { ok: false, error: 'FFmpeg 不可用' }
+  if (!Array.isArray(frames) || frames.length === 0) return { ok: false, error: '无帧数据' }
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'artshadow-exp-'))
+  try {
+    // Write frames to disk as frame_0001.jpg ...
+    const padding = String(frames.length).length
+    for (let i = 0; i < frames.length; i++) {
+      const b64 = frames[i].replace(/^data:image\/[a-z]+;base64,/, '')
+      fs.writeFileSync(path.join(tmpDir, 'frame_' + String(i + 1).padStart(padding, '0') + '.jpg'), Buffer.from(b64, 'base64'))
+    }
+    const rate = Math.max(1, Math.min(60, Math.round(fps || 30)))
+    const outPath = path.join(tmpDir, 'output.mp4')
+    const pattern = path.join(tmpDir, 'frame_%0' + padding + 'd.jpg')
+    await new Promise((resolve, reject) => {
+      const proc = spawn(ffmpegPath, [
+        '-y', '-framerate', String(rate), '-i', pattern,
+        '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
+        '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+        outPath
+      ])
+      let stderr = ''
+      proc.stderr.on('data', d => stderr += d)
+      proc.on('close', (code) => code === 0 && fs.existsSync(outPath) ? resolve() : reject(new Error('ffmpeg code ' + code + ' ' + stderr.slice(-300))))
+      proc.on('error', reject)
+    })
+    // Ask user where to save
+    const r = await dialog.showSaveDialog(mainWindow, {
+      title: '保存合成视频',
+      defaultPath: '画影客对比_' + Date.now() + '.mp4',
+      filters: [{ name: 'MP4 视频', extensions: ['mp4'] }]
+    })
+    if (r.canceled || !r.filePath) return { ok: false, canceled: true }
+    fs.copyFileSync(outPath, r.filePath)
+    return { ok: true, path: r.filePath }
+  } catch(e) {
+    return { ok: false, error: (e && e.message ? e.message : String(e)).slice(0, 400) }
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch(e) {}
+  }
 })
 
 app.whenReady().then(() => {

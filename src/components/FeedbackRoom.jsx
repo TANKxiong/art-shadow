@@ -731,9 +731,90 @@ export default function FeedbackRoom({ onBack }) {
 
   // Download: composite video(s) + per-frame drawings into a new video (WebM)
   // Uses source resolution for sharp output + native captureStream auto-sampling for smoothness
+  // Electron export: capture each frame as JPEG (seek + draw), send to main for FFmpeg MP4 encode
+  const vcDownloadFfmpeg = async (va, vb) => {
+    const maxDur = Math.max(va.duration || 0, vb.duration || 0)
+    if (maxDur <= 0) { alert('视频未加载完成，无法下载'); return }
+    const fps = Math.max(1, Math.min(30, vcFps || 30))
+    const vw = va.videoWidth || 1280, vh = va.videoHeight || 720
+    const bw = vb.videoWidth || vw, bh = vb.videoHeight || vh
+    let W = vw, H = vh
+    if (vcMode === 'side') { W = vw * 2; H = vh }
+    else if (vcMode === 'stack') { W = vw; H = vh * 2 }
+    else if (vcMode === 'overlay') { W = Math.max(vw, bw); H = Math.max(vh, bh) }
+    const MAX = 2560
+    if (W > MAX || H > MAX) { const s = Math.min(MAX / W, MAX / H); W = Math.round(W * s); H = Math.round(H * s) }
+    const canvas = document.createElement('canvas')
+    canvas.width = W; canvas.height = H
+    const ctx = canvas.getContext('2d')
+    const srcCanvas = vcCanvasRef.current
+    const dispRect = srcCanvas ? srcCanvas.getBoundingClientRect() : { width: W, height: H }
+    const sx = W / Math.max(1, dispRect.width), sy = H / Math.max(1, dispRect.height)
+    const drawContain = (video, dx, dy, dw, dh) => {
+      const vwd = video.videoWidth || 1, vhd = video.videoHeight || 1
+      const s = Math.min(dw / vwd, dh / vhd)
+      const w = vwd * s, h = vhd * s
+      ctx.drawImage(video, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h)
+    }
+    const drawFrame = (fn) => {
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H)
+      if (vcMode === 'side') {
+        drawContain(va, 0, 0, W / 2, H); drawContain(vb, W / 2, 0, W / 2, H)
+      } else if (vcMode === 'stack') {
+        drawContain(va, 0, 0, W, H / 2); drawContain(vb, 0, H / 2, W, H / 2)
+      } else if (vcMode === 'overlay') {
+        ctx.save(); ctx.globalAlpha = vaOpacity; drawContain(va, 0, 0, W, H); ctx.restore()
+        ctx.save(); ctx.globalAlpha = vbOpacity; drawContain(vb, 0, 0, W, H); ctx.restore()
+      } else {
+        drawContain(va, 0, 0, W, H)
+      }
+      ctx.save(); ctx.scale(sx, sy)
+      vcGetStrokes(fn).forEach(st => vcPaintStroke(ctx, st))
+      ctx.restore()
+    }
+
+    setVcPlaying(false)
+    setVcDownloading(true)
+    va.muted = true; vb.muted = true
+    va.pause(); vb.pause()
+    const totalFrames = Math.max(1, Math.round(maxDur * fps))
+    const frames = []
+    const seekBoth = (t) => new Promise(res => {
+      let done = false
+      const finish = () => { if (!done) { done = true; res() } }
+      va.onseeked = finish; vb.onseeked = finish
+      try { va.currentTime = t; vb.currentTime = t } catch(e) { finish() }
+      setTimeout(finish, 120)
+    })
+    try {
+      await seekBoth(0)
+      for (let f = 0; f < totalFrames; f++) {
+        await seekBoth(f / fps)
+        drawFrame(f)
+        frames.push(canvas.toDataURL('image/jpeg', 0.9))
+        // yield to UI periodically
+        if (f % 20 === 0) await new Promise(r => setTimeout(r, 0))
+      }
+      const res = await window.electronAPI.exportFrames(frames, fps)
+      if (res && res.ok) alert('✅ 已保存：' + res.path)
+      else if (res && res.canceled) { /* user cancelled save dialog */ }
+      else alert('导出失败：' + ((res && res.error) || '未知错误'))
+    } catch(e) {
+      alert('导出出错：' + (e.message || e))
+    } finally {
+      setVcDownloading(false)
+      va.onseeked = null; vb.onseeked = null
+    }
+  }
+
   const vcDownload = async () => {
     const va = vaRef.current, vb = vbRef.current
     if (!va || !vb || vcDownloading) return
+    // Electron: use FFmpeg frame-export path (rock solid, no browser recorder jank)
+    if (window.electronAPI && window.electronAPI.exportFrames) {
+      await vcDownloadFfmpeg(va, vb)
+      return
+    }
     // Use original video resolution (no quality loss)
     const vw = va.videoWidth || 1280, vh = va.videoHeight || 720
     const bw = vb.videoWidth || vw, bh = vb.videoHeight || vh
