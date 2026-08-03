@@ -28,9 +28,19 @@ const MODULES = [
   }
 ]
 
-const APP_VERSION = '1.2.0'
+const APP_VERSION = '1.3.0'
 
 const CHANGELOG = [
+  {
+    version: '1.3.0',
+    date: '2026-08-03',
+    title: '反馈室 · 视频下载',
+    items: [
+      '一键下载合成视频：涂鸦标注与视频画面合并导出',
+      '横向/上下/重叠对比均可整段导出为新视频',
+      '打包版使用 FFmpeg 编码：标准 MP4 格式、高清不压缩、流畅不卡顿'
+    ]
+  },
   {
     version: '1.2.0',
     date: '2026-08-03',
