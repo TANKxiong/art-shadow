@@ -28,13 +28,48 @@
 }
 .toggleBtn:hover { background: #1e2130; color: #e2e8f0; }
 
-.body { flex: 1; display: flex; overflow: hidden; }
+.body { flex: 1; display: flex; overflow: hidden; position: relative; }
 
-.leftPanel, .rightPanel {
-  width: 260px; flex-shrink: 0; background: #16181f;
+.leftPanel {
+  position: absolute; left: 0; top: 0; bottom: 0; z-index: 30;
+  width: 260px; background: #16181f;
   border-right: 1px solid #1e2130; display: flex; flex-direction: column;
+  transform: translateX(-100%); transition: transform 0.22s ease;
+  box-shadow: 4px 0 16px rgba(0,0,0,0.35);
 }
-.rightPanel { border-right: none; border-left: 1px solid #1e2130; }
+.leftOpen { transform: translateX(0); }
+.edgeZone {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 14px; z-index: 25;
+  background: transparent; cursor: pointer;
+}
+.edgeZone:hover { background: rgba(99,102,241,0.12); }
+.rightPanel {
+  position: absolute; right: 0; top: 0; bottom: 0; z-index: 30;
+  width: 260px; background: #16181f;
+  border-left: 1px solid #1e2130; display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.22s ease;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.35);
+}
+.rightOpen { transform: translateX(0); }
+.edgeZoneRight {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 14px; z-index: 25;
+  background: transparent; cursor: pointer;
+}
+.edgeZoneRight:hover { background: rgba(99,102,241,0.12); }
+
+.vcDrawPanel { border-bottom: 1px solid #1e2130; flex-shrink: 0; }
+.vcDrawTools { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.vcDrawRow { display: flex; align-items: center; gap: 8px; }
+.vcDrawLabel { font-size: 11px; color: #94a3b8; white-space: nowrap; min-width: 48px; }
+.vcDrawnBox { border-top: 1px solid #1e2130; padding-top: 8px; }
+.vcDrawnLabel { font-size: 10px; color: #64748b; margin-bottom: 6px; }
+.vcDrawnList { display: flex; flex-wrap: wrap; gap: 4px; max-height: 110px; overflow-y: auto; }
+.vcDrawnChip {
+  padding: 2px 8px; border-radius: 10px; border: 1px solid #1e2130;
+  background: transparent; color: #94a3b8; font-size: 10px; cursor: pointer; font-family: inherit;
+}
+.vcDrawnChip:hover { background: #1e2130; color: #e2e8f0; }
+.vcDrawnOn { background: #6366f1; border-color: #6366f1; color: #fff; }
 
 .panelTitle {
   padding: 10px 14px; font-size: 12px; font-weight: 600; color: #94a3b8;
@@ -51,6 +86,27 @@
 }
 .matItem:hover { background: #1e2130; color: #e2e8f0; }
 .matActive { background: #1e2130; color: #e2e8f0; font-weight: 600; }
+.matSel { background: rgba(99,102,241,0.18); }
+.matCheck {
+  width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
+  border: 1px solid #475569; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #fff; background: transparent;
+}
+.matSel .matCheck { background: #6366f1; border-color: #6366f1; }
+.confirmMask { position: fixed; inset: 0; z-index: 120; background: transparent; }
+.confirmBox {
+  position: fixed; z-index: 121; min-width: 180px;
+  background: #16181f; border: 1px solid #1e2130; border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.confirmMsg { font-size: 12px; color: #e2e8f0; }
+.confirmBtns { display: flex; justify-content: flex-end; gap: 8px; }
+.confirmOk {
+  padding: 5px 14px; border-radius: 6px; border: none;
+  background: #ef4444; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.confirmOk:hover { background: #dc2626; }
 .matName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .matCount { font-size: 10px; color: #64748b; }
 .matDel {
@@ -61,11 +117,13 @@
 .matDel:hover { background: #3b1c1c; color: #ef4444; }
 
 .centerPanel {
-  flex: 1; display: flex; align-items: flex-start; justify-content: center;
+  flex: 1; display: flex; align-items: stretch; justify-content: center;
   background: #0f1117; position: relative; overflow: hidden;
-  padding: 0 40px 40px 40px;
+  padding: 0;
 }
-.centerEmpty { text-align: center; color: #94a3b8; }
+.centerEmpty {
+  align-self: center; text-align: center; color: #94a3b8;
+}
 
 .rightContent { flex: 1; overflow-y: auto; }
 
@@ -99,3 +157,237 @@
   border: 1px solid #1e2130; background: #0f1117; color: #e2e8f0;
   font-size: 12px; margin-bottom: 4px; font-family: inherit;
 }
+
+.verWrap { padding: 12px; }
+.verSelects { padding: 4px 0 10px; }
+
+.vcStage { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 14px 20px; box-sizing: border-box; }
+.vcSelects { display: flex; align-items: center; gap: 12px; }
+.vcSelects .verSelect { flex: 1; margin: 0; }
+.vsBadge {
+  padding: 4px 12px; border-radius: 20px; background: #6366f1;
+  color: #fff; font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.vcHint {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  color: #64748b; font-size: 14px;
+}
+
+.vcPanel { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.vcModeBar { display: flex; gap: 8px; flex-shrink: 0; }
+.vcModeBtn {
+  padding: 6px 14px; border-radius: 6px; border: 1px solid #1e2130;
+  background: transparent; color: #94a3b8; font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.12s;
+}
+.vcModeBtn:hover { background: #1e2130; color: #e2e8f0; }
+.vcModeOn { background: #6366f1; border-color: #6366f1; color: #fff; }
+.vcModeSep { flex: 1; }
+.vcToolGroup { display: flex; gap: 2px; }
+.vcToolBtn {
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid #1e2130;
+  background: transparent; color: #94a3b8; font-size: 13px;
+  cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center;
+}
+.vcToolBtn:hover { background: #1e2130; }
+.vcToolOn { background: #6366f1; border-color: #6366f1; color: #fff; }
+.vcColorPick { width: 30px; height: 30px; padding: 0; border: 1px solid #1e2130; border-radius: 6px; background: none; cursor: pointer; }
+.vcDrawSize { width: 90px; accent-color: #6366f1; cursor: pointer; }
+.vcEraseHint { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+.vcFrameBadge {
+  padding: 4px 10px; border-radius: 6px; background: #1e2130;
+  color: #e2e8f0; font-size: 11px; font-weight: 600; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.vcEraseCursor {
+  position: absolute; z-index: 6; pointer-events: none;
+  border: 2px dashed #fff; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px rgba(0,0,0,0.6);
+}
+.vcTextOverlay {
+  position: absolute; z-index: 8; transform: translate(-50%, -120%);
+  pointer-events: auto;
+}
+.vcTextBox {
+  background: #16181f; border: 1px solid #6366f1; border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 12px; width: 260px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.vcTextBoxTitle { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+.vcTextInput {
+  padding: 8px 10px; border-radius: 6px; border: 1px solid #1e2130;
+  background: #0f1117; color: #e2e8f0; font-size: 13px; font-family: inherit;
+  outline: none;
+}
+.vcTextInput:focus { border-color: #6366f1; }
+.vcTextBoxBtns { display: flex; justify-content: flex-end; gap: 8px; }
+.vcTextCancel {
+  padding: 5px 12px; border-radius: 6px; border: 1px solid #1e2130;
+  background: transparent; color: #94a3b8; font-size: 12px; cursor: pointer; font-family: inherit;
+}
+.vcTextCancel:hover { background: #1e2130; }
+.vcTextOk {
+  padding: 5px 14px; border-radius: 6px; border: none;
+  background: #6366f1; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.vcTextOk:hover { background: #4f46e5; }
+.vcCanvas { position: absolute; inset: 0; z-index: 4; pointer-events: none; width: 100%; height: 100%; }
+.vcCanvasOn { pointer-events: auto; cursor: crosshair; touch-action: none; }
+.vcVideos { flex: 1; display: flex; gap: 10px; min-height: 0; position: relative; }
+.vcStack { flex-direction: column; }
+.vcStack .vcBox { flex: 1; min-height: 0; }
+.vcOverlay { position: relative; display: block; }
+.vcOverlay .vcBox { position: absolute; inset: 0; background: transparent; border: none; }
+.vcOverlay .vcBox video { background: transparent; }
+.vcOverlay .vcLabel { display: none; }
+.vcOverlay .vcPlaceholder { width: 100%; height: 100%; }
+.vcOpacityBar {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 5;
+  display: flex; flex-direction: column; gap: 6px;
+  background: rgba(15,17,23,0.85); border: 1px solid #1e2130;
+  padding: 10px 12px; border-radius: 12px; font-size: 11px; color: #94a3b8;
+}
+.vcOpacityTitle { font-size: 10px; color: #64748b; text-align: center; }
+.vcOpacityRow { display: flex; align-items: center; gap: 6px; }
+.vcOpacityRow input { width: 90px; accent-color: #6366f1; cursor: pointer; }
+.vcOpacityRow span { min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+.vcTransBtn {
+  width: 24px; height: 24px; border-radius: 6px; border: 1px solid #1e2130;
+  background: transparent; color: #94a3b8; font-size: 12px;
+  cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.vcTransBtn:hover { background: #1e2130; }
+.vcTransOn { background: #6366f1; border-color: #6366f1; color: #fff; }
+.vcBox {
+  flex: 1; min-width: 0; background: #0f1117;
+  border: 1px solid #1e2130; border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.vcLabel {
+  padding: 7px 10px; font-size: 12px; font-weight: 600; color: #94a3b8;
+  background: #1e2130; border-bottom: 1px solid #1e2130; text-align: center; flex-shrink: 0;
+}
+.vcBox video {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+  background: #000; min-height: 0;
+}
+.vcPlaceholder {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  color: #64748b; font-size: 13px; background: #0f1117;
+}
+.vcControls {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: #16181f;
+  border: 1px solid #1e2130; border-radius: 10px; flex-shrink: 0;
+}
+.vcBtn {
+  padding: 7px 16px; border-radius: 6px; border: none;
+  background: #6366f1; color: #fff; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.vcBtn:hover { background: #4f46e5; }
+.vcFrameBtn {
+  padding: 6px 10px; border-radius: 6px; border: 1px solid #1e2130;
+  background: transparent; color: #94a3b8; font-size: 12px;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.vcFrameBtn:hover { background: #1e2130; color: #e2e8f0; }
+.vcLoopOn { background: #10b981; border-color: #10b981; color: #fff; }
+.vcVolIcon { font-size: 12px; color: #94a3b8; white-space: nowrap; }
+.vcVolBtn {
+  width: 28px; height: 28px; border-radius: 6px; border: none;
+  background: transparent; color: #94a3b8; font-size: 14px;
+  cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center;
+}
+.vcVolBtn:hover { background: #1e2130; color: #e2e8f0; }
+.vcVolMute { color: #ef4444; }
+.vcVol { width: 70px; accent-color: #6366f1; cursor: pointer; }
+.vcTime { font-size: 12px; color: #94a3b8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vcSlider { flex: 1; min-width: 0; accent-color: #6366f1; cursor: pointer; }
+.vcSliderWrap { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
+.vcSliderWrap .vcSlider { width: 100%; }
+.vcTicks { position: absolute; top: 50%; left: 0; right: 0; height: 0; pointer-events: none; }
+.vcTick {
+  position: absolute; top: 0; width: 1px; height: 6px;
+  background: rgba(148,163,184,0.35); transform: translateY(-50%);
+}
+.vcTickMajor { height: 10px; background: rgba(226,232,240,0.6); }
+.vcFrameInput {
+  width: 62px; padding: 5px 8px; border-radius: 6px;
+  border: 1px solid #1e2130; background: #0f1117; color: #e2e8f0;
+  font-size: 12px; font-family: inherit; font-variant-numeric: tabular-nums;
+}
+.vcFrameInput:focus { outline: none; border-color: #6366f1; }
+.vcFrameLabel { font-size: 11px; color: #64748b; white-space: nowrap; }
+
+.importMenu {
+  position: absolute; top: 34px; right: 0; z-index: 20;
+  background: #16181f; border: 1px solid #1e2130; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4); overflow: hidden; min-width: 150px;
+}
+.importMenuItem {
+  display: block; width: 100%; padding: 10px 16px;
+  background: none; border: none; color: #e2e8f0; font-size: 13px;
+  cursor: pointer; text-align: left; font-family: inherit;
+}
+.importMenuItem:hover { background: #1e2130; }
+
+.modalMask {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+.libModal {
+  width: 640px; max-width: 92vw; max-height: 72vh;
+  background: #16181f; border: 1px solid #1e2130; border-radius: 12px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.libTitle {
+  padding: 14px 18px; font-size: 14px; font-weight: 600;
+  border-bottom: 1px solid #1e2130;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.libBody { flex: 1; display: flex; min-height: 0; }
+.libCats {
+  width: 200px; flex-shrink: 0; overflow-y: auto;
+  border-right: 1px solid #1e2130; padding: 6px;
+}
+.libCatItem {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; color: #94a3b8; transition: all 0.12s;
+}
+.libCatItem:hover { background: #1e2130; color: #e2e8f0; }
+.libCatOn { background: rgba(99,102,241,0.15); color: #e2e8f0; font-weight: 600; }
+.libCatChild { padding-left: 24px; font-size: 12px; }
+.libCatCount { font-size: 10px; color: #64748b; background: #1e2130; padding: 1px 7px; border-radius: 8px; }
+.libList { flex: 1; overflow-y: auto; padding: 6px; min-width: 0; }
+.libItem {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-radius: 8px; cursor: pointer; font-size: 13px; color: #94a3b8;
+  transition: all 0.12s;
+}
+.libItem:hover { background: #1e2130; color: #e2e8f0; }
+.libItemOn { background: rgba(99,102,241,0.15); color: #e2e8f0; }
+.libCheck {
+  width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+  border: 1px solid #475569; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #fff; background: transparent;
+}
+.libItemOn .libCheck { background: #6366f1; border-color: #6366f1; }
+.libFooter {
+  padding: 12px 18px; border-top: 1px solid #1e2130;
+  display: flex; justify-content: flex-end; gap: 10px;
+}
+.libCancel {
+  padding: 7px 18px; border-radius: 6px; border: 1px solid #1e2130;
+  background: transparent; color: #94a3b8; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.libCancel:hover { background: #1e2130; }
+.libOk {
+  padding: 7px 18px; border-radius: 6px; border: none;
+  background: #6366f1; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.libOk:hover { background: #4f46e5; }
+.libOk:disabled { background: #312e81; color: #818cf8; cursor: not-allowed; }

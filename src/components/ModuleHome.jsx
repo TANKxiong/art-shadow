@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import styles from '../styles/ModuleHome.module.css'
 
 const MODULES = [
@@ -22,13 +22,44 @@ const MODULES = [
     id: 'feedback',
     name: '反馈室',
     icon: '💬',
-    desc: '团队协作评审、动画反馈汇总、修改意见追踪。让外包沟通更高效。',
-    tags: ['多人协作', '意见汇总', '版本对比'],
+    desc: '新旧版本并排/上下/重叠对比，同步播放、逐帧检查、画笔标注。让对比反馈更直观。',
+    tags: ['版本对比', '同步播放', '逐帧标注'],
     tagClass: 'tagGreen'
   }
 ]
 
+const APP_VERSION = '1.1.0'
+
+const CHANGELOG = [
+  {
+    version: '1.1.0',
+    date: '2026-08-03',
+    title: '反馈室 · 版本对比',
+    items: [
+      '素材双来源导入：本地文件 / 素材库（按分类筛选），反馈素材独立存储',
+      '新旧版本三种对比模式：横向、上下、重叠（重叠支持双视频独立透明度控制）',
+      '双视频同步播放/暂停、时间轴同步拖动、循环播放、音量/静音控制',
+      '逐帧播放：方向键单击跳帧、按住连续播放、帧号直接跳转、时间轴帧刻度',
+      '画笔全套工具：画笔/矩形/圆形/直线/箭头/文字/橡皮，按帧存储+叠影参考',
+      '文字可选中拖动、角点缩放；已绘制帧列表一键跳转',
+      '素材批量删除、鼠标位置自定义确认弹窗'
+    ]
+  },
+  {
+    version: '1.0.0',
+    date: '2026-07-31',
+    title: '画影客 v1.0 发布',
+    items: [
+      '素材库：树形分类、视频/图片导入、链接导入、拖拽上传、视频裁剪',
+      '创作台：逐帧画笔、形状、文字、橡皮、叠影、3D人偶',
+      '数据本地存储 + 导出/导入备份',
+      'Electron 便携版打包，Windows 可直接运行'
+    ]
+  }
+]
+
 export default function ModuleHome({ onSelect, user, onLoginClick }) {
+  const [showLog, setShowLog] = useState(false)
   return (
     <div className={styles.moduleHome}>
       {user ? (
@@ -41,6 +72,10 @@ export default function ModuleHome({ onSelect, user, onLoginClick }) {
           <span>👤 登录</span>
         </div>
       )}
+      <button className={styles.announceBtn} onClick={()=>setShowLog(!showLog)} title="更新公告">
+        📢 <span className={styles.announceBadge}>NEW</span>
+      </button>
+      <div className={styles.versionTag}>v{APP_VERSION}</div>
       <div className={styles.moduleTitle}>画影客</div>
       <div className={styles.moduleSub}>游走于绘画与影像之间的创作工具</div>
       <div className={styles.moduleCards}>
@@ -57,6 +92,30 @@ export default function ModuleHome({ onSelect, user, onLoginClick }) {
           </div>
         ))}
       </div>
+      {showLog && (
+        <div className={styles.logMask} onClick={()=>setShowLog(false)}>
+          <div className={styles.logPanel} onClick={e=>e.stopPropagation()}>
+            <div className={styles.logHeader}>
+              <span>📢 更新公告</span>
+              <button className={styles.logClose} onClick={()=>setShowLog(false)}>×</button>
+            </div>
+            <div className={styles.logBody}>
+              {CHANGELOG.map(log => (
+                <div key={log.version} className={styles.logItem}>
+                  <div className={styles.logTitle}>
+                    <span className={styles.logVersion}>v{log.version}</span>
+                    <span className={styles.logDate}>{log.date}</span>
+                    <span className={styles.logName}>{log.title}</span>
+                  </div>
+                  <ul className={styles.logList}>
+                    {log.items.map((it, i) => <li key={i}>{it}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

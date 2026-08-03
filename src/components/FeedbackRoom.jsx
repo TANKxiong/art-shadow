@@ -1,41 +1,75 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store/StoreContext'
 import styles from '../styles/FeedbackRoom.module.css'
 
 export default function FeedbackRoom({ onBack }) {
   const { state, dispatch } = useStore()
   const { materials } = state
-  const [active, setActive] = useState('collab')
+  const [active, setActive] = useState('version')
   const [selectedMat, setSelectedMat] = useState(null)
-  const [showLeft, setShowLeft] = useState(true)
-  const [showRight, setShowRight] = useState(true)
-
-  const [feedbacks, setFeedbacks] = useState(() => {
-    const saved = localStorage.getItem('artshadow-feedbacks')
-    return saved ? JSON.parse(saved) : []
+  const [showLeft, setShowLeft] = useState(false)
+  const [showRight, setShowRight] = useState(false)
+  const hideRightTimer = useRef(null)
+  const [importMenu, setImportMenu] = useState(false)
+  const [libPicker, setLibPicker] = useState(false)
+  const [libPickSet, setLibPickSet] = useState(new Set())
+  const [libCat, setLibCat] = useState('all')
+  const [roomMats, setRoomMats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('artshadow-roommats') || '[]') } catch { return [] }
   })
-  const saveFeedbacks = (fb) => { setFeedbacks(fb); localStorage.setItem('artshadow-feedbacks', JSON.stringify(fb)) }
+  const saveRoomMats = (arr) => { setRoomMats(arr); localStorage.setItem('artshadow-roommats', JSON.stringify(arr)) }
+  // Feedback-room-only materials (local imports stay here, NOT added to library store)
+  const [roomMatData, setRoomMatData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('artshadow-roommatdata') || '{}') } catch { return {} }
+  })
+  const saveRoomMatData = (data) => { setRoomMatData(data); localStorage.setItem('artshadow-roommatdata', JSON.stringify(Object.fromEntries(Object.entries(data).map(([k,v])=>{ const {_file, ...rest} = v; return [k, rest] })))) }
+  const roomMaterial = (id) => roomMatData[id] || materials.find(m => m.id === id)
+  const [confirmBox, setConfirmBox] = useState(null) // {x,y,message,onConfirm}
+  const [multiMode, setMultiMode] = useState(false)
+  const [selSet, setSelSet] = useState(new Set())
 
-  const addFeedback = () => {
-    if (!selectedMat) return
-    const fb = { id: Date.now().toString(36), materialId: selectedMat,
-      frame: prompt('帧号', '整体')||'整体', content: prompt('反馈')||'',
-      author: JSON.parse(localStorage.getItem('artshadow-user')||'{}').name||'匿名',
-      status: '待处理', createdAt: new Date().toLocaleString('zh-CN') }
-    if (fb.content) saveFeedbacks([fb, ...feedbacks])
+  // Category tree helpers (same logic as Sidebar)
+  const catChildren = (id) => state.categories.filter(c => c.parentId === id)
+  const collectCatIds = (id) => {
+    let ids = [id]
+    catChildren(id).forEach(c => ids = ids.concat(collectCatIds(c.id)))
+    return ids
   }
-  const updateStatus = (id, s) => saveFeedbacks(feedbacks.map(f => f.id===id?{...f,status:s}:f))
-  const deleteFeedback = (id) => saveFeedbacks(feedbacks.filter(f => f.id!==id))
-  const matFeedbacks = feedbacks.filter(f => f.materialId === selectedMat)
+  const libMaterials = libCat === 'all'
+    ? materials
+    : materials.filter(m => collectCatIds(libCat).includes(m.categoryId))
+  const rootCats = state.categories.filter(c => !c.parentId)
 
   const handleImport = () => {
     const inp = document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='video/*,image/*'
-    inp.onchange = e => dispatch({type:'ADD_MATERIALS',payload:Array.from(e.target.files).map(f => ({
-      id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-      originalName:f.name,type:f.type.startsWith('video/')?'video':'image',
-      size:f.size,categoryId:null,importedAt:new Date().toISOString(),_file:f
-    }))})
+    inp.onchange = e => {
+      const arr = Array.from(e.target.files).map(f => ({
+        id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+        originalName:f.name,type:f.type.startsWith('video/')?'video':'image',
+        size:f.size,categoryId:null,importedAt:new Date().toISOString(),_file:f
+      }))
+      // Keep local imports in the feedback room only (not added to library store)
+      const data = { ...roomMatData }
+      arr.forEach(m => { data[m.id] = m })
+      saveRoomMatData(data)
+      saveRoomMats([...new Set([...roomMats, ...arr.map(m=>m.id)])])
+    }
     inp.click()
+  }
+
+  const confirmLibPick = () => {
+    if (libPickSet.size === 0) { setLibPicker(false); return }
+    saveRoomMats([...new Set([...roomMats, ...libPickSet])])
+    setLibPickSet(new Set())
+    setLibPicker(false)
+  }
+
+  const toggleLibPick = (id) => {
+    setLibPickSet(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
   }
 
   const handleDragStart = (e, m) => { e.dataTransfer.setData('materialId', m.id) }
@@ -47,7 +81,610 @@ export default function FeedbackRoom({ onBack }) {
   const handleDragOver = e => e.preventDefault()
 
   const [verA, setVerA] = useState(''); const [verB, setVerB] = useState('')
-  const matA = materials.find(m => m.id === verA); const matB = materials.find(m => m.id === verB)
+  const matA = roomMaterial(verA); const matB = roomMaterial(verB)
+
+  // ---- Version compare: dual video sync ----
+  const [vaSrc, setVaSrc] = useState(null)
+  const [vbSrc, setVbSrc] = useState(null)
+  const [vaDur, setVaDur] = useState(0)
+  const [vbDur, setVbDur] = useState(0)
+  const [vcTime, setVcTime] = useState(0)
+  const [vcPlaying, setVcPlaying] = useState(false)
+  const [vcDragging, setVcDragging] = useState(false)
+  const [vcMode, setVcMode] = useState('side') // side | stack | overlay
+  const [vaOpacity, setVaOpacity] = useState(1)
+  const [vbOpacity, setVbOpacity] = useState(0.5)
+  const [vcFps, setVcFps] = useState(30)
+  const [vcDraw, setVcDraw] = useState(false)
+  const [vcTool, setVcTool] = useState('pen') // pen | rect | ellipse | line | arrow | text | eraser
+  const [vcDrawColor, setVcDrawColor] = useState('#ff4757')
+  const [vcDrawSize, setVcDrawSize] = useState(4)
+  const [vcEraseSize, setVcEraseSize] = useState(40)
+  const [vcOnion, setVcOnion] = useState(false)
+  const [vcFrameNum, setVcFrameNum] = useState(0)
+  const [vcDrawnFrames, setVcDrawnFrames] = useState([])
+  const [vcTextPrompt, setVcTextPrompt] = useState(null) // {x,y} -> centered input overlay
+  const [vcVol, setVcVol] = useState(1)
+  const [vcLoop, setVcLoop] = useState(false)
+  const [vcLoopStart, setVcLoopStart] = useState(0)
+  const [vcMouse, setVcMouse] = useState(null)
+  const vcCanvasRef = useRef(null)
+  const vcDrawingRef = useRef(false)
+  const vcLastPosRef = useRef(null)
+  const vcShapeStartRef = useRef(null)
+  const vcShapeEndRef = useRef(null)
+  const vcStrokeRef = useRef(null) // in-progress pen stroke points
+  const vcFramesRef = useRef({}) // { frameNum: [stroke...] }
+  const vcDirtyRef = useRef(false)
+  const vcSelTextRef = useRef(null) // selected text object {fn, x,y,content,color,size}
+  const vcSelDragRef = useRef(null) // 'move' | 'scale' | null
+  const vcSelStartRef = useRef(null) // drag start snapshot
+  const hideLeftTimer = useRef(null)
+  const vcToolbar = [
+    { key:'select', icon:'🖱️', label:'选择' },
+    { key:'pen', icon:'🖊️', label:'画笔' },
+    { key:'rect', icon:'▭', label:'矩形' },
+    { key:'ellipse', icon:'◯', label:'圆形' },
+    { key:'line', icon:'╱', label:'直线' },
+    { key:'arrow', icon:'➡️', label:'箭头' },
+    { key:'text', icon:'🅣', label:'文字' },
+    { key:'eraser', icon:'🧽', label:'橡皮' }
+  ]
+  const vaRef = useRef(null)
+  const vbRef = useRef(null)
+  const vcSyncRef = useRef(0)
+
+  const resolveSrc = (m, setSrc) => {
+    if (!m) { setSrc(null); return }
+    if (window.electronAPI && m.fileName) {
+      window.electronAPI.getMaterialPath(m.fileName).then(p => setSrc(p))
+    } else if (m._file) {
+      setSrc(URL.createObjectURL(m._file))
+    } else if (m.embedUrl) {
+      setSrc(m.embedUrl)
+    } else { setSrc(null) }
+  }
+
+  useEffect(() => {
+    resolveSrc(matA, setVaSrc)
+    resolveSrc(matB, setVbSrc)
+    setVcTime(0); setVcPlaying(false); setVaDur(0); setVbDur(0)
+    vcFramesRef.current = {}
+    vcStrokeRef.current = null
+    vcShapeStartRef.current = null; vcShapeEndRef.current = null
+    vcSelTextRef.current = null
+    setVcFrameNum(0)
+    setVcDrawnFrames([])
+  }, [verA, verB])
+
+  // Sync play/pause: both videos follow the same state
+  useEffect(() => {
+    const va = vaRef.current, vb = vbRef.current
+    if (!va || !vb) return
+    vcSyncRef.current++
+    if (vcPlaying) { va.play().catch(()=>{}); vb.play().catch(()=>{}) }
+    else { va.pause(); vb.pause() }
+    const t = setTimeout(() => vcSyncRef.current--, 50)
+    return () => clearTimeout(t)
+  }, [vcPlaying])
+
+  // Sync volume + loop on both videos
+  useEffect(() => {
+    const va = vaRef.current, vb = vbRef.current
+    if (va) { va.volume = vcVol; va.loop = vcLoop }
+    if (vb) { vb.volume = vcVol; vb.loop = vcLoop }
+  }, [vcVol, vcLoop])
+
+  // Loop range: when either video ends, restart from loopStart if set
+  const onVcEnded = () => {
+    if (!vcLoop) return
+    const va = vaRef.current, vb = vbRef.current
+    if (!va || !vb) return
+    const restart = Math.min(vcLoopStart, va.duration||0, vb.duration||0)
+    vcSyncRef.current++
+    va.currentTime = restart
+    vb.currentTime = restart
+    setVcTime(restart)
+    setVcFrameNum(Math.round(restart * vcFps))
+    va.play().catch(()=>{}); vb.play().catch(()=>{})
+    setTimeout(() => vcSyncRef.current--, 50)
+  }
+
+  // Sync seek: when one video seeks during drag, mirror to the other
+  const onVcSeek = (e) => {
+    const va = vaRef.current, vb = vbRef.current
+    if (!va || !vb) return
+    if (vcSyncRef.current > 0) return
+    const t = parseFloat(e.target.value) || 0
+    vcSyncRef.current++
+    va.currentTime = Math.min(t, va.duration || t)
+    vb.currentTime = Math.min(t, vb.duration || t)
+    setVcTime(t)
+    setVcFrameNum(Math.round(t * vcFps))
+    setTimeout(() => vcSyncRef.current--, 50)
+  }
+
+  // Timeupdate from either video drives the shared slider (only when not dragging)
+  const onVaTime = () => {
+    if (vcDragging || vcSyncRef.current > 0) return
+    const va = vaRef.current
+    if (va && !isNaN(va.currentTime)) {
+      setVcTime(va.currentTime)
+      setVcFrameNum(Math.round(va.currentTime * vcFps))
+    }
+  }
+
+  // Master time slider drag
+  const onVcSliderDown = () => setVcDragging(true)
+  const onVcSliderUp = () => setVcDragging(false)
+
+  // Global keyboard: space toggles play, arrow keys step frames (smooth rAF while held)
+  useEffect(() => {
+    const stepTimer = { t: null }
+    const stepRaf = { id: null }
+    const pauseAll = () => {
+      const va = vaRef.current, vb = vbRef.current
+      if (va) va.pause()
+      if (vb) vb.pause()
+      setVcPlaying(false)
+    }
+    const step = (dir) => {
+      const va = vaRef.current, vb = vbRef.current
+      if (!va || !vb) return
+      const maxDur = Math.max(va.duration||0, vb.duration||0)
+      const nt = Math.max(0, Math.min(maxDur, (va.currentTime||0) + dir / vcFps))
+      vcSyncRef.current++
+      va.currentTime = Math.min(nt, va.duration||nt)
+      vb.currentTime = Math.min(nt, vb.duration||nt)
+      setVcTime(nt)
+      setVcFrameNum(Math.round(nt * vcFps))
+      setTimeout(() => vcSyncRef.current--, 50)
+    }
+    const startLoop = (dir) => {
+      if (stepRaf.id) return
+      const loop = () => {
+        step(dir)
+        stepRaf.id = requestAnimationFrame(loop)
+      }
+      loop()
+    }
+    const stopLoop = () => {
+      if (stepTimer.t) { clearTimeout(stepTimer.t); stepTimer.t = null }
+      if (stepRaf.id) { cancelAnimationFrame(stepRaf.id); stepRaf.id = null }
+    }
+    const onKeyDown = (e) => {
+      const tag = e.target && e.target.tagName
+      if (tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (tag === 'INPUT') {
+        const t = e.target.type
+        // allow space on range sliders, block on text/number inputs
+        if (t !== 'range') return
+      }
+      if (e.code === 'Space') {
+        if (!matA || !matB) return
+        e.preventDefault()
+        setVcPlaying(p => !p)
+        return
+      }
+      if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+        if (!matA || !matB) return
+        e.preventDefault()
+        if (e.repeat) return // repeat handled by rAF loop
+        pauseAll()
+        const dir = e.code === 'ArrowLeft' ? -1 : 1
+        step(dir) // immediate single frame
+        // Enter continuous mode after short hold
+        stopLoop()
+        stepTimer.t = setTimeout(() => { startLoop(dir) }, 120)
+      }
+    }
+    const onKeyUp = (e) => {
+      if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') stopLoop()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keyup', onKeyUp)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keyup', onKeyUp)
+      stopLoop()
+    }
+  }, [matA, matB, vcFps])
+
+  const fmtVc = (s) => { if (!isFinite(s)) s = 0; const m = Math.floor(s/60), ss = Math.floor(s%60); return `${m}:${String(ss).padStart(2,'0')}` }
+
+  // Detect fps from first video
+  useEffect(() => {
+    const v = vaRef.current
+    if (!v) return
+    let f = 30
+    if (v.captureStream) {
+      try {
+        const tracks = v.captureStream().getVideoTracks()
+        if (tracks.length > 0 && tracks[0]?.getSettings) {
+          const s = tracks[0].getSettings()
+          if (s.frameRate && s.frameRate > 0) f = Math.round(s.frameRate)
+        }
+      } catch(e) {}
+    }
+    setVcFps(f)
+  }, [vaSrc])
+
+  // Step both videos by one frame
+  const stepVc = (dir) => {
+    const va = vaRef.current, vb = vbRef.current
+    if (!va || !vb) return
+    const maxDur = Math.max(va.duration||0, vb.duration||0)
+    const nt = Math.max(0, Math.min(maxDur, vcTime + dir / vcFps))
+    vcSyncRef.current++
+    va.currentTime = Math.min(nt, va.duration||nt)
+    vb.currentTime = Math.min(nt, vb.duration||nt)
+    setVcTime(nt)
+    setVcFrameNum(Math.round(nt * vcFps))
+    setTimeout(() => vcSyncRef.current--, 50)
+  }
+
+  // Canvas drawing helpers (vector strokes per frame)
+  const vcCanvasPos = (e) => {
+    const c = vcCanvasRef.current
+    if (!c) return {x:0,y:0}
+    const r = c.getBoundingClientRect()
+    return { x: e.clientX - r.left, y: e.clientY - r.top }
+  }
+  const vcCurFrame = () => {
+    // Follow the actual playing video frame (like library DrawingTool)
+    const v = vaRef.current
+    if (v && !isNaN(v.currentTime)) return Math.round(v.currentTime * vcFps)
+    return Math.round(vcTime * vcFps)
+  }
+  const vcGetStrokes = (fn) => vcFramesRef.current[fn] || []
+  const vcSaveFrame = (fn, strokes) => {
+    vcFramesRef.current[fn] = strokes
+    setVcDrawnFrames(Object.keys(vcFramesRef.current).map(Number).filter(k => (vcFramesRef.current[k]||[]).length > 0).sort((a,b)=>a-b))
+    vcDirtyRef.current = true
+  }
+  // Jump both videos to a specific frame
+  const vcGotoFrame = (n) => {
+    const va = vaRef.current, vb = vbRef.current
+    if (!va || !vb) return
+    const maxDur = Math.max(va.duration||0, vb.duration||0)
+    const t = Math.max(0, Math.min(maxDur, n / vcFps))
+    vcSyncRef.current++
+    va.currentTime = Math.min(t, va.duration||t)
+    vb.currentTime = Math.min(t, vb.duration||t)
+    setVcTime(t)
+    setVcFrameNum(Math.round(t * vcFps))
+    setTimeout(() => vcSyncRef.current--, 50)
+  }
+
+  // Text hit-testing: return the text object at (mx,my) on current frame, or null
+  const vcTextSize = (t) => {
+    const fs = t.size * 5 // matches render font size (bold size*5 px)
+    return { tw: Math.max(60, (t.content||'').length * fs * 0.62 + 20), th: fs * 1.6 }
+  }
+  const vcTextCorners = (t) => {
+    const { tw, th } = vcTextSize(t)
+    return [
+      {x:t.x-3, y:t.y-3},
+      {x:t.x+tw+3, y:t.y-3},
+      {x:t.x+tw+3, y:t.y+th+3},
+      {x:t.x-3, y:t.y+th+3}
+    ]
+  }
+  const vcHitText = (mx, my) => {
+    const fn = vcCurFrame()
+    const strokes = vcGetStrokes(fn)
+    for (let i = strokes.length - 1; i >= 0; i--) {
+      const st = strokes[i]
+      if (st.type !== 'text') continue
+      const { tw, th } = vcTextSize(st)
+      if (mx >= st.x && mx <= st.x + tw && my >= st.y && my <= st.y + th) {
+        return { fn, idx: i, ...st }
+      }
+    }
+    return null
+  }
+
+  // Render one stroke (vector)
+  const vcPaintStroke = (ctx, st) => {
+    ctx.globalCompositeOperation = 'source-over'
+    if (st.type === 'pen') {
+      const pts = st.points || []
+      if (pts.length === 0) return
+      ctx.strokeStyle = st.color; ctx.lineWidth = st.size
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y)
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+      ctx.stroke()
+    } else if (st.type === 'rect') {
+      ctx.strokeStyle = st.color; ctx.lineWidth = st.size; ctx.lineCap = 'round'
+      ctx.strokeRect(st.x, st.y, st.w, st.h)
+    } else if (st.type === 'ellipse') {
+      ctx.strokeStyle = st.color; ctx.lineWidth = st.size
+      ctx.beginPath(); ctx.ellipse(st.cx, st.cy, st.rx, st.ry, 0, 0, Math.PI*2); ctx.stroke()
+    } else if (st.type === 'line' || st.type === 'arrow') {
+      ctx.strokeStyle = st.color; ctx.lineWidth = st.size; ctx.lineCap = 'round'
+      ctx.beginPath(); ctx.moveTo(st.x1, st.y1); ctx.lineTo(st.x2, st.y2); ctx.stroke()
+      if (st.type === 'arrow') {
+        const dx = st.x2-st.x1, dy = st.y2-st.y1, len = Math.hypot(dx,dy)
+        if (len > 5) {
+          const nx = dx/len, ny = dy/len, as = Math.max(8, st.size * 3)
+          ctx.fillStyle = st.color
+          ctx.beginPath()
+          ctx.moveTo(st.x2, st.y2)
+          ctx.lineTo(st.x2 - nx*as + ny*as*0.4, st.y2 - ny*as - nx*as*0.4)
+          ctx.lineTo(st.x2 - nx*as - ny*as*0.4, st.y2 - ny*as + nx*as*0.4)
+          ctx.closePath(); ctx.fill()
+        }
+      }
+    } else if (st.type === 'text') {
+      ctx.fillStyle = st.color
+      ctx.font = `bold ${st.size * 5}px sans-serif`
+      ctx.textBaseline = 'top'
+      ctx.fillText(st.content, st.x, st.y)
+    }
+  }
+
+  // Full redraw: onion skins (other frames) + current frame + in-progress stroke + shape preview
+  const vcRender = () => {
+    const c = vcCanvasRef.current
+    if (!c) return
+    const ctx = c.getContext('2d')
+    ctx.clearRect(0, 0, c.width, c.height)
+    const cfn = vcCurFrame()
+    if (vcOnion) {
+      for (const key of Object.keys(vcFramesRef.current)) {
+        const fn = Number(key)
+        if (isNaN(fn) || fn === cfn) continue
+        ctx.save(); ctx.globalAlpha = 0.45
+        vcGetStrokes(fn).forEach(st => vcPaintStroke(ctx, st))
+        ctx.restore()
+      }
+    }
+    vcGetStrokes(cfn).forEach(st => vcPaintStroke(ctx, st))
+    // in-progress pen stroke
+    if (vcStrokeRef.current && vcStrokeRef.current.points.length > 1) {
+      ctx.save(); ctx.globalAlpha = 0.9
+      vcPaintStroke(ctx, vcStrokeRef.current)
+      ctx.restore()
+    }
+    // shape preview
+    if (vcShapeStartRef.current && vcShapeEndRef.current && ['rect','ellipse','line','arrow'].includes(vcTool)) {
+      const s = vcShapeStartRef.current, e = vcShapeEndRef.current
+      const preview = {
+        type: vcTool, color: vcDrawColor, size: vcDrawSize,
+        ...(vcTool==='rect' ? {x:s.x, y:s.y, w:e.x-s.x, h:e.y-s.y}
+          : vcTool==='ellipse' ? {cx:(s.x+e.x)/2, cy:(s.y+e.y)/2, rx:Math.abs(e.x-s.x)/2, ry:Math.abs(e.y-s.y)/2}
+          : {x1:s.x, y1:s.y, x2:e.x, y2:e.y})
+      }
+      ctx.save(); ctx.globalAlpha = 0.85
+      vcPaintStroke(ctx, preview)
+      ctx.restore()
+    }
+    // selected text box (dashed rect + 4 corner handles)
+    const sel = vcSelTextRef.current
+    if (sel && sel.fn === cfn) {
+      const { tw, th } = vcTextSize(sel)
+      ctx.strokeStyle = '#5b9bd5'; ctx.lineWidth = 1; ctx.setLineDash([4,4])
+      ctx.strokeRect(sel.x - 3, sel.y - 3, tw + 6, th + 6)
+      ctx.setLineDash([])
+      const corners = [{x:sel.x-3,y:sel.y-3},{x:sel.x+tw+3,y:sel.y-3},{x:sel.x+tw+3,y:sel.y+th+3},{x:sel.x-3,y:sel.y+th+3}]
+      corners.forEach(c => { ctx.fillStyle = '#fff'; ctx.strokeStyle = '#3d7abf'; ctx.lineWidth = 1.5; ctx.fillRect(c.x-4,c.y-4,8,8); ctx.strokeRect(c.x-4,c.y-4,8,8) })
+    }
+    vcDirtyRef.current = false
+  }
+
+  // Render loop: redraw every frame so strokes follow the current video frame
+  useEffect(() => {
+    let raf
+    const loop = () => {
+      vcRender()
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [vcDraw, vcMode, vcOnion, vcTool])
+
+  const vcDrawDown = (e) => {
+    if (!vcDraw) return
+    e.preventDefault()
+    const pos = vcCanvasPos(e)
+    if (vcTool === 'select') {
+      // hit corner handle first, then body
+      const sel = vcSelTextRef.current
+      if (sel && sel.fn === vcCurFrame()) {
+        const corners = vcTextCorners(sel)
+        const corner = corners.find(c => Math.abs(pos.x-c.x) < 9 && Math.abs(pos.y-c.y) < 9)
+        if (corner) {
+          vcSelDragRef.current = 'scale'
+          vcSelStartRef.current = { ...sel, corner }
+          vcDrawingRef.current = true
+          return
+        }
+        const { tw, th } = vcTextSize(sel)
+        if (pos.x >= sel.x-3 && pos.x <= sel.x+tw+3 && pos.y >= sel.y-3 && pos.y <= sel.y+th+3) {
+          vcSelDragRef.current = 'move'
+          vcSelStartRef.current = { ...sel, mx: pos.x, my: pos.y }
+          vcDrawingRef.current = true
+          return
+        }
+      }
+      const hit = vcHitText(pos.x, pos.y)
+      if (hit) {
+        vcSelTextRef.current = hit
+        vcDirtyRef.current = true
+      } else {
+        vcSelTextRef.current = null
+        vcDirtyRef.current = true
+      }
+      return
+    }
+    if (vcTool === 'text') {
+      // open centered text input overlay at click position
+      setVcTextPrompt({ x: pos.x, y: pos.y })
+      return
+    }
+    vcDrawingRef.current = true
+    vcLastPosRef.current = pos
+    if (vcTool === 'pen') {
+      vcStrokeRef.current = { type:'pen', points:[pos], color:vcDrawColor, size:vcDrawSize }
+    } else if (vcTool === 'eraser') {
+      vcEraseAt(pos.x, pos.y)
+    } else {
+      vcShapeStartRef.current = pos
+      vcShapeEndRef.current = pos
+    }
+    vcDirtyRef.current = true
+  }
+  const vcDrawMove = (e) => {
+    if (!vcDraw) return
+    const pos = vcCanvasPos(e)
+    setVcMouse(pos)
+    if (!vcDrawingRef.current) return
+    e.preventDefault()
+    if (vcTool === 'select' && vcSelDragRef.current) {
+      const sel = vcSelTextRef.current
+      if (!sel) { vcSelDragRef.current = null; return }
+      const start = vcSelStartRef.current
+      const strokes = vcGetStrokes(sel.fn)
+      const cur = strokes[sel.idx]
+      if (!cur) { vcSelDragRef.current = null; return }
+      if (vcSelDragRef.current === 'move') {
+        const nx = cur.x + (pos.x - start.mx)
+        const ny = cur.y + (pos.y - start.my)
+        const next = strokes.map((s,i) => i===sel.idx ? { ...s, x:nx, y:ny } : s)
+        vcSaveFrame(sel.fn, next)
+        vcSelTextRef.current = { ...sel, x:nx, y:ny }
+        vcSelStartRef.current = { ...start, mx: pos.x, my: pos.y }
+      } else if (vcSelDragRef.current === 'scale') {
+        const { tw } = vcTextSize(cur)
+        const base = Math.max(tw, 40)
+        const dist = Math.hypot(pos.x - cur.x, pos.y - cur.y)
+        const origDist = Math.hypot(start.corner.x - cur.x, start.corner.y - cur.y) || base
+        const ratio = dist / origDist
+        const newSize = Math.max(6, Math.round(cur.size * ratio))
+        const next = strokes.map((s,i) => i===sel.idx ? { ...s, size:newSize } : s)
+        vcSaveFrame(sel.fn, next)
+        vcSelTextRef.current = { ...sel, size:newSize }
+      }
+      vcDirtyRef.current = true
+      return
+    }
+    if (vcTool === 'pen' && vcStrokeRef.current) {
+      const last = vcStrokeRef.current.points[vcStrokeRef.current.points.length-1]
+      if (Math.hypot(pos.x-last.x, pos.y-last.y) > 1.5) vcStrokeRef.current.points.push(pos)
+      vcDirtyRef.current = true
+    } else if (vcTool === 'eraser') {
+      vcEraseAt(pos.x, pos.y)
+    } else if (['rect','ellipse','line','arrow'].includes(vcTool)) {
+      vcShapeEndRef.current = pos
+      vcDirtyRef.current = true
+    }
+  }
+  const vcDrawUp = () => {
+    vcSelDragRef.current = null
+    vcSelStartRef.current = null
+    if (!vcDrawingRef.current) return
+    vcDrawingRef.current = false
+    if (vcTool === 'pen' && vcStrokeRef.current) {
+      const fn = vcCurFrame()
+      const st = vcStrokeRef.current
+      if (st.points.length > 1) vcSaveFrame(fn, [...vcGetStrokes(fn), st])
+      vcStrokeRef.current = null
+    } else if (['rect','ellipse','line','arrow'].includes(vcTool) && vcShapeStartRef.current && vcShapeEndRef.current) {
+      const s = vcShapeStartRef.current, e = vcShapeEndRef.current
+      const fn = vcCurFrame()
+      const st = {
+        type: vcTool, color: vcDrawColor, size: vcDrawSize,
+        ...(vcTool==='rect' ? {x:s.x, y:s.y, w:e.x-s.x, h:e.y-s.y}
+          : vcTool==='ellipse' ? {cx:(s.x+e.x)/2, cy:(s.y+e.y)/2, rx:Math.abs(e.x-s.x)/2, ry:Math.abs(e.y-s.y)/2}
+          : {x1:s.x, y1:s.y, x2:e.x, y2:e.y})
+      }
+      vcSaveFrame(fn, [...vcGetStrokes(fn), st])
+      vcShapeStartRef.current = null; vcShapeEndRef.current = null
+    }
+    vcLastPosRef.current = null
+    vcDirtyRef.current = true
+  }
+
+  // Erase: remove points/strokes within radius on current frame
+  const vcEraseAt = (mx, my) => {
+    const fn = vcCurFrame()
+    const strokes = vcGetStrokes(fn)
+    if (strokes.length === 0) return
+    const r = vcEraseSize / 2
+    const next = strokes.map(st => {
+      if (st.type === 'pen') {
+        const kept = (st.points || []).filter(p => Math.hypot(p.x-mx, p.y-my) >= r)
+        if (kept.length < 2) return null
+        return { ...st, points: kept }
+      }
+      if (st.type === 'text') {
+        if (Math.hypot(st.x-mx, st.y-my) < r) return null
+        return st
+      }
+      const cx = st.type==='rect' ? st.x+st.w/2 : st.type==='ellipse' ? st.cx : (st.x1+st.x2)/2
+      const cy = st.type==='rect' ? st.y+st.h/2 : st.type==='ellipse' ? st.cy : (st.y1+st.y2)/2
+      if (Math.hypot(cx-mx, cy-my) < r) return null
+      return st
+    }).filter(Boolean)
+    vcSaveFrame(fn, next)
+    vcDirtyRef.current = true
+  }
+
+  const vcClearDraw = () => {
+    vcFramesRef.current = {}
+    setVcDrawnFrames([])
+    vcStrokeRef.current = null
+    vcShapeStartRef.current = null; vcShapeEndRef.current = null
+    vcDirtyRef.current = true
+    vcRender()
+  }
+  const vcWheel = (e) => {
+    if (!vcDraw || vcTool !== 'eraser') return
+    e.preventDefault()
+    setVcEraseSize(s => Math.max(8, Math.min(200, s + (e.deltaY < 0 ? 5 : -5))))
+  }
+  const vcTextConfirm = (txt) => {
+    setVcTextPrompt(null)
+    const pos = vcTextPrompt
+    if (!pos || !txt) return
+    const fn = vcCurFrame()
+    const strokes = vcGetStrokes(fn)
+    const size = Math.max(4, vcDrawSize)
+    const obj = { type:'text', x:pos.x, y:pos.y, content:txt, color:vcDrawColor, size }
+    vcSaveFrame(fn, [...strokes, obj])
+    // auto-select the new text and switch to select tool so user can move/scale
+    vcSelTextRef.current = { fn, idx: strokes.length, ...obj }
+    setVcTool('select')
+    vcDirtyRef.current = true
+  }
+  const vcResizeCanvas = () => {
+    const c = vcCanvasRef.current
+    if (!c) return
+    const parent = c.parentElement
+    if (!parent) return
+    const dpr = window.devicePixelRatio || 1
+    const w = parent.clientWidth, h = parent.clientHeight
+    if (w === 0 || h === 0) return
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+      c.width = Math.round(w * dpr)
+      c.height = Math.round(h * dpr)
+    }
+    c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0)
+  }
+  useEffect(() => {
+    if (!vcDraw) return
+    vcResizeCanvas()
+    const parent = vcCanvasRef.current?.parentElement
+    let ro = null
+    if (parent && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => vcResizeCanvas())
+      ro.observe(parent)
+    }
+    const t = setTimeout(vcResizeCanvas, 300)
+    window.addEventListener('resize', vcResizeCanvas)
+    return () => { clearTimeout(t); if (ro) ro.disconnect(); window.removeEventListener('resize', vcResizeCanvas) }
+  }, [vcDraw, vcMode])
 
   return (
     <div className={styles.room}>
@@ -55,90 +692,347 @@ export default function FeedbackRoom({ onBack }) {
         <button className={styles.backBtn} onClick={onBack}>← 返回首页</button>
         <div className={styles.topTitle}>💬 反馈室</div>
         <div className={styles.topTabs}>
-          <button className={`${styles.topTab} ${active==='collab'?styles.topTabOn:''}`} onClick={()=>setActive('collab')}>👥 多人协作</button>
-          <button className={`${styles.topTab} ${active==='summary'?styles.topTabOn:''}`} onClick={()=>setActive('summary')}>📋 意见汇总</button>
-          <button className={`${styles.topTab} ${active==='version'?styles.topTabOn:''}`} onClick={()=>setActive('version')}>🔄 版本对比</button>
+          <button className={`${styles.topTab} ${styles.topTabOn}`}>🔄 版本对比</button>
         </div>
-        <button className={styles.importBtn} onClick={handleImport}>+ 导入素材</button>
+        <div style={{position:'relative'}}>
+          <button className={styles.importBtn} onClick={()=>setImportMenu(!importMenu)}>+ 导入素材</button>
+          {importMenu && (
+            <div className={styles.importMenu}>
+              <button className={styles.importMenuItem} onClick={()=>{setImportMenu(false);handleImport()}}>📁 本地文件</button>
+              <button className={styles.importMenuItem} onClick={()=>{setImportMenu(false);setLibPicker(true)}}>🗂️ 素材库</button>
+            </div>
+          )}
+        </div>
         <button className={styles.toggleBtn} onClick={()=>setShowLeft(!showLeft)}>{showLeft?'◀':'▶'}</button>
         <button className={styles.toggleBtn} onClick={()=>setShowRight(!showRight)}>{showRight?'▶':'◀'}</button>
       </div>
 
       <div className={styles.body}>
-        {showLeft && (
-          <div className={styles.leftPanel}>
-            <div className={styles.panelTitle}>素材列表 ({materials.length})</div>
-            <div className={styles.matList}>
-              {materials.slice(0,30).map(m => (
-                <div key={m.id} className={`${styles.matItem} ${selectedMat===m.id?styles.matActive:''}`}
-                  onClick={()=>setSelectedMat(m.id)} draggable onDragStart={e=>handleDragStart(e,m)}>
-                  <span>{m.type==='video'?'🎬':'🖼️'}</span>
-                  <span className={styles.matName}>{m.displayName||m.originalName}</span>
-                  <span className={styles.matCount}>{feedbacks.filter(f=>f.materialId===m.id).length}条</span>
-                  <button className={styles.matDel} onClick={e=>{e.stopPropagation();if(confirm('删除？'))dispatch({type:'DELETE_MATERIAL',payload:m.id})}}>×</button>
-                </div>
-              ))}
+        <div className={`${styles.leftPanel} ${showLeft?styles.leftOpen:''}`}
+          onMouseEnter={()=>{clearTimeout(hideLeftTimer.current);setShowLeft(true)}}
+          onMouseLeave={()=>{hideLeftTimer.current=setTimeout(()=>setShowLeft(false),300)}}>
+          <div className={styles.panelTitle}>
+            反馈素材 ({roomMats.length})
+            <div style={{display:'flex',gap:4,alignItems:'center'}}>
+              {multiMode && (
+                <>
+                  <button className={styles.addBtn} style={{background:'#ef4444'}}
+                    onClick={e=>{
+                      const pos = e.currentTarget.getBoundingClientRect()
+                      setConfirmBox({ x: pos.left, y: pos.bottom, message:`确定删除选中的 ${selSet.size} 个素材？`, onConfirm:()=>{
+                        saveRoomMats(roomMats.filter(x=>!selSet.has(x)))
+                        setSelSet(new Set()); setMultiMode(false)
+                      }})
+                    }} disabled={selSet.size===0}>删除({selSet.size})</button>
+                  <button className={styles.addBtn} style={{background:'#475569'}} onClick={()=>{setSelSet(new Set());setMultiMode(false)}}>完成</button>
+                </>
+              )}
+              <button className={styles.addBtn} onClick={()=>{setMultiMode(!multiMode);setSelSet(new Set())}}>
+                {multiMode ? '✓' : '☑️'}
+              </button>
             </div>
           </div>
-        )}
+          <div className={styles.matList}>
+            {roomMats.length === 0 && <div className={styles.emptyTxt}>点右上角「+ 导入素材」<br/>从本地或素材库添加</div>}
+            {roomMats.map(id => {
+              const m = roomMaterial(id)
+              if (!m) return null
+              const isSel = selSet.has(m.id)
+              return (
+                <div key={m.id} className={`${styles.matItem} ${selectedMat===m.id?styles.matActive:''} ${isSel?styles.matSel:''}`}
+                  onClick={()=>{
+                    if (multiMode) {
+                      setSelSet(prev => { const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n })
+                    } else {
+                      setSelectedMat(m.id)
+                    }
+                  }} draggable={!multiMode} onDragStart={e=>handleDragStart(e,m)}>
+                  {multiMode && <span className={styles.matCheck}>{isSel?'✓':''}</span>}
+                  <span>{m.type==='video'?'🎬':'🖼️'}</span>
+                  <span className={styles.matName}>{m.displayName||m.originalName}</span>
+                  <button className={styles.matDel} onClick={e=>{
+                    e.stopPropagation()
+                    const pos = e.currentTarget.getBoundingClientRect()
+                    setConfirmBox({ x: pos.left, y: pos.bottom, message:'从反馈室移除？', onConfirm:()=>saveRoomMats(roomMats.filter(x=>x!==m.id)) })
+                  }}>×</button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+        <div className={styles.edgeZone} onMouseEnter={()=>{clearTimeout(hideLeftTimer.current);setShowLeft(true)}} title="靠近显示素材列表" />
 
         <div className={styles.centerPanel} onDrop={handleDrop} onDragOver={handleDragOver}>
-          <div className={styles.centerEmpty}>
-            <span style={{fontSize:64,opacity:.15}}>🎬</span>
-            <p style={{fontSize:16,color:'#94a3b8'}}>从左侧拖入素材</p>
-            <p style={{fontSize:12,color:'#475569'}}>自动弹出完整预览 · 画笔 · 逐帧 · 标注</p>
+          {active==='version' ? (
+            <div className={styles.vcStage}>
+              <div className={styles.vcSelects}>
+                <select value={verA} onChange={e=>setVerA(e.target.value)} className={styles.verSelect}>
+                  <option value="">← 旧版本</option>
+                  {roomMats.map(id => {
+                    const m = roomMaterial(id)
+                    return m ? <option key={m.id} value={m.id}>{m.displayName||m.originalName}</option> : null
+                  })}
+                </select>
+                <div className={styles.vsBadge}>VS</div>
+                <select value={verB} onChange={e=>setVerB(e.target.value)} className={styles.verSelect}>
+                  <option value="">新版本 →</option>
+                  {roomMats.map(id => {
+                    const m = roomMaterial(id)
+                    return m ? <option key={m.id} value={m.id}>{m.displayName||m.originalName}</option> : null
+                  })}
+                </select>
+              </div>
+              {(!matA || !matB) ? (
+                <div className={styles.vcHint}>👆 分别选择旧/新版本素材，生成对比</div>
+              ) : (
+                <div className={styles.vcPanel}>
+                  <div className={styles.vcModeBar}>
+                    <button className={`${styles.vcModeBtn} ${vcMode==='side'?styles.vcModeOn:''}`} onClick={()=>setVcMode('side')}>↔️ 横向对比</button>
+                    <button className={`${styles.vcModeBtn} ${vcMode==='stack'?styles.vcModeOn:''}`} onClick={()=>setVcMode('stack')}>↕️ 上下对比</button>
+                    <button className={`${styles.vcModeBtn} ${vcMode==='overlay'?styles.vcModeOn:''}`} onClick={()=>setVcMode('overlay')}>🔀 重叠对比</button>
+                  </div>
+                  <div className={`${styles.vcVideos} ${vcMode==='stack'?styles.vcStack:''} ${vcMode==='overlay'?styles.vcOverlay:''}`}>
+                    <div className={styles.vcBox}>
+                      <div className={styles.vcLabel}>旧版本</div>
+                      {vaSrc
+                        ? <video ref={vaRef} src={vaSrc} onLoadedMetadata={e=>setVaDur(e.target.duration||0)} onTimeUpdate={onVaTime} onEnded={onVcEnded} style={vcMode==='overlay'?{opacity:vaOpacity}:undefined} />
+                        : <div className={styles.vcPlaceholder}>无法加载</div>}
+                    </div>
+                    <div className={styles.vcBox}>
+                      <div className={styles.vcLabel}>新版本</div>
+                      {vbSrc
+                        ? <video ref={vbRef} src={vbSrc} onLoadedMetadata={e=>setVbDur(e.target.duration||0)} onEnded={onVcEnded} style={vcMode==='overlay'?{opacity:vbOpacity}:undefined} />
+                        : <div className={styles.vcPlaceholder}>无法加载</div>}
+                    </div>
+                    {vcMode==='overlay' && (
+                      <div className={styles.vcOpacityBar}>
+                        <div className={styles.vcOpacityTitle}>透明度</div>
+                        <div className={styles.vcOpacityRow}>
+                          <span>旧</span>
+                          <input type="range" min="0" max="1" step="0.05" value={vaOpacity}
+                            onChange={e=>setVaOpacity(parseFloat(e.target.value))} />
+                          <span>{Math.round(vaOpacity*100)}%</span>
+                          <button className={`${styles.vcTransBtn} ${vaOpacity===0?styles.vcTransOn:''}`}
+                            onClick={()=>setVaOpacity(vaOpacity===0?1:0)} title="一键全透明/恢复">{vaOpacity===0?'👁️':'🫥'}</button>
+                        </div>
+                        <div className={styles.vcOpacityRow}>
+                          <span>新</span>
+                          <input type="range" min="0" max="1" step="0.05" value={vbOpacity}
+                            onChange={e=>setVbOpacity(parseFloat(e.target.value))} />
+                          <span>{Math.round(vbOpacity*100)}%</span>
+                          <button className={`${styles.vcTransBtn} ${vbOpacity===0?styles.vcTransOn:''}`}
+                            onClick={()=>setVbOpacity(vbOpacity===0?0.5:0)} title="一键全透明/恢复">{vbOpacity===0?'👁️':'🫥'}</button>
+                        </div>
+                      </div>
+                    )}
+                    <canvas ref={vcCanvasRef} className={`${styles.vcCanvas} ${vcDraw?styles.vcCanvasOn:''}`}
+                      onMouseDown={vcDrawDown} onMouseMove={vcDrawMove} onMouseUp={vcDrawUp} onMouseLeave={vcDrawUp}
+                      onWheel={vcWheel} style={vcTool==='eraser'?{cursor:'none'}:undefined} />
+                    {vcDraw && vcTool==='eraser' && vcMouse && (
+                      <div className={styles.vcEraseCursor} style={{left:vcMouse.x, top:vcMouse.y, width:vcEraseSize, height:vcEraseSize}} />
+                    )}
+                    {vcTextPrompt && (
+                      <div className={styles.vcTextOverlay} style={{left:vcTextPrompt.x, top:vcTextPrompt.y}}>
+                        <div className={styles.vcTextBox}>
+                          <div className={styles.vcTextBoxTitle}>✏️ 输入文字</div>
+                          <input className={styles.vcTextInput} autoFocus
+                            placeholder="在这里输入文字…"
+                            onKeyDown={e=>{
+                              if (e.key==='Enter') vcTextConfirm(e.target.value)
+                              if (e.key==='Escape') setVcTextPrompt(null)
+                            }}
+                            onBlur={e=>setVcTextPrompt(null)} />
+                          <div className={styles.vcTextBoxBtns}>
+                            <button className={styles.vcTextCancel} onClick={()=>setVcTextPrompt(null)}>取消</button>
+                            <button className={styles.vcTextOk} onClick={e=>vcTextConfirm(e.target.value)}>确定</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className={styles.vcControls}>
+                    <button className={styles.vcBtn} onClick={()=>setVcPlaying(!vcPlaying)}>
+                      {vcPlaying ? '⏸ 暂停' : '▶ 播放'}
+                    </button>
+                    <button className={styles.vcFrameBtn} onClick={()=>stepVc(-1)} title="上一帧">⏮</button>
+                    <button className={styles.vcFrameBtn} onClick={()=>stepVc(1)} title="下一帧">⏭</button>
+                    <span className={styles.vcTime}>{fmtVc(vcTime)}</span>
+                    <div className={styles.vcSliderWrap}>
+                      <input type="range" className={styles.vcSlider} min="0" max={Math.max(vaDur, vbDur) || 1} step="0.01"
+                        value={vcTime}
+                        onChange={onVcSeek}
+                        onMouseDown={onVcSliderDown}
+                        onMouseUp={onVcSliderUp}
+                        onTouchStart={onVcSliderDown}
+                        onTouchEnd={onVcSliderUp}
+                      />
+                      <div className={styles.vcTicks}>
+                        {(() => {
+                          const dur = Math.max(vaDur, vbDur) || 0
+                          const marks = []
+                          const totalSec = Math.floor(dur)
+                          for (let s = 0; s <= totalSec; s++) {
+                            marks.push({ s, major: s % 5 === 0 })
+                          }
+                          return marks.map((m, i) => (
+                            <span key={i} className={`${styles.vcTick} ${m.major?styles.vcTickMajor:''}`}
+                              style={{ left: (m.s/dur*100)+'%' }}
+                              title={`${fmtVc(m.s)} · 帧 ${Math.round(m.s*vcFps)}`} />
+                          ))
+                        })()}
+                      </div>
+                    </div>
+                    <span className={styles.vcTime}>{fmtVc(Math.max(vaDur, vbDur))}</span>
+                    <button className={`${styles.vcFrameBtn} ${vcLoop?styles.vcLoopOn:''}`} onClick={()=>{
+                      setVcLoop(!vcLoop)
+                      if (!vcLoop) setVcLoopStart(vcTime)
+                    }} title="循环播放（点按当前时间为循环起点）">{vcLoop?'🔁 循环':'🔂 循环'}</button>
+                    <button className={`${styles.vcVolBtn} ${vcVol===0?styles.vcVolMute:''}`} onClick={()=>setVcVol(vcVol===0?1:0)} title="一键静音">
+                      {vcVol===0 ? '🔇' : '🔊'}
+                    </button>
+                    <input type="range" className={styles.vcVol} min="0" max="1" step="0.05" value={vcVol}
+                      onChange={e=>setVcVol(parseFloat(e.target.value))} title="音量" />
+                    <input type="number" className={styles.vcFrameInput} min="0" max={Math.round(Math.max(vaDur,vbDur)*vcFps)}
+                      value={vcFrameNum}
+                      onChange={e=>{
+                        const n = parseInt(e.target.value)
+                        if (!isNaN(n)) {
+                          const t = Math.max(0, Math.min(Math.max(vaDur,vbDur)||0, n / vcFps))
+                          const va = vaRef.current, vb = vbRef.current
+                          if (va && vb) {
+                            vcSyncRef.current++
+                            va.currentTime = Math.min(t, va.duration||t)
+                            vb.currentTime = Math.min(t, vb.duration||t)
+                            setVcTime(t)
+                            setVcFrameNum(Math.round(t * vcFps))
+                            setTimeout(() => vcSyncRef.current--, 50)
+                          }
+                        }
+                      }} title="输入帧号跳转" />
+                    <span className={styles.vcFrameLabel}>帧</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={styles.centerEmpty}>
+              <span style={{fontSize:64,opacity:.15}}>🎬</span>
+              <p style={{fontSize:16,color:'#94a3b8'}}>从左侧拖入素材</p>
+              <p style={{fontSize:12,color:'#475569'}}>自动弹出完整预览 · 画笔 · 逐帧 · 标注</p>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.edgeZoneRight} onMouseEnter={()=>{clearTimeout(hideRightTimer.current);setShowRight(true)}} title="靠近显示反馈/画笔" />
+
+        <div className={`${styles.rightPanel} ${showRight?styles.rightOpen:''}`}
+          onMouseEnter={()=>{clearTimeout(hideRightTimer.current);setShowRight(true)}}
+          onMouseLeave={()=>{hideRightTimer.current=setTimeout(()=>setShowRight(false),300)}}>
+          <div className={styles.vcDrawPanel}>
+            <div className={styles.panelTitle}>✏️ 画笔工具</div>
+            <div className={styles.vcDrawTools}>
+              <button className={`${styles.vcModeBtn} ${vcDraw?styles.vcModeOn:''}`} onClick={()=>setVcDraw(!vcDraw)}>
+                {vcDraw ? '✅ 画笔已开启' : '✏️ 开启画笔'}
+              </button>
+                {vcDraw && (
+                  <>
+                    <div className={styles.vcToolGroup}>
+                      {vcToolbar.map(t => (
+                        <button key={t.key} className={`${styles.vcToolBtn} ${vcTool===t.key?styles.vcToolOn:''}`}
+                          onClick={()=>{setVcTool(t.key); vcSelTextRef.current=null; vcDirtyRef.current=true}} title={t.label}>{t.icon}</button>
+                      ))}
+                    </div>
+                    <div className={styles.vcDrawRow}>
+                      <span className={styles.vcDrawLabel}>颜色</span>
+                      <input type="color" value={vcDrawColor} onChange={e=>setVcDrawColor(e.target.value)} className={styles.vcColorPick} />
+                    </div>
+                    <div className={styles.vcDrawRow}>
+                      <span className={styles.vcDrawLabel}>{vcTool==='eraser'?'橡皮大小':'粗细'}</span>
+                      {vcTool==='eraser' ? (
+                        <span className={styles.vcEraseHint}>滚轮 · {vcEraseSize}px</span>
+                      ) : (
+                        <input type="range" min="1" max="20" value={vcDrawSize} onChange={e=>setVcDrawSize(parseInt(e.target.value))} className={styles.vcDrawSize} />
+                      )}
+                    </div>
+                    <div className={styles.vcDrawRow}>
+                      <button className={`${styles.vcModeBtn} ${vcOnion?styles.vcModeOn:''}`} onClick={()=>setVcOnion(!vcOnion)} title="叠影：显示其他帧笔迹">👻 叠影</button>
+                      <button className={styles.vcModeBtn} onClick={vcClearDraw}>🗑️ 清空</button>
+                    </div>
+                    <div className={styles.vcDrawRow}>
+                      <span className={styles.vcFrameBadge}>当前帧 {vcFrameNum}</span>
+                    </div>
+                    {vcDrawnFrames.length > 0 && (
+                      <div className={styles.vcDrawnBox}>
+                        <div className={styles.vcDrawnLabel}>已绘制帧（点击跳转）</div>
+                        <div className={styles.vcDrawnList}>
+                          {vcDrawnFrames.map(n => (
+                            <button key={n} className={`${styles.vcDrawnChip} ${n===vcFrameNum?styles.vcDrawnOn:''}`}
+                              onClick={()=>vcGotoFrame(n)} title={`跳转到帧 ${n}`}>帧{n}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        {showRight && (
-          <div className={styles.rightPanel}>
-            <div className={styles.panelTitle}>
-              {active==='collab'?'反馈区':active==='summary'?'意见汇总':'版本对比'}
-              {selectedMat&&active==='collab'&&<button className={styles.addBtn} onClick={addFeedback}>+ 添加</button>}
-            </div>
-            <div className={styles.rightContent}>
-              {active==='collab' && (selectedMat ? matFeedbacks.length===0
-                ? <div className={styles.emptyTxt}>暂无反馈</div>
-                : matFeedbacks.map(fb => (
-                  <div key={fb.id} className={styles.fbItem}>
-                    <div className={styles.fbFrame}>{fb.frame}</div>
-                    <div className={styles.fbContent}>{fb.content}</div>
-                    <div className={styles.fbMeta}>{fb.author}·{fb.createdAt}</div>
-                    <select className={`${styles.fbStatus} ${styles['st'+fb.status]}`} value={fb.status} onChange={e=>updateStatus(fb.id,e.target.value)}>
-                      <option value="待处理">待处理</option><option value="讨论中">讨论中</option><option value="已处理">已处理</option>
-                    </select>
-                    <button className={styles.fbDel} onClick={()=>deleteFeedback(fb.id)}>×</button>
-                  </div>
-                ))
-                : <div className={styles.emptyTxt}>← 选择素材</div>
-              )}
-              {active==='summary' && feedbacks.map(fb => {
-                const mat = materials.find(m=>m.id===fb.materialId)
-                return (
-                  <div key={fb.id} className={styles.fbItem}>
-                    <div className={styles.fbFrame}>{fb.frame}</div>
-                    <div className={styles.fbContent}>
-                      <div style={{fontSize:10,color:'#94a3b8'}}>{mat?.displayName||mat?.originalName||'?'}</div>
-                      {fb.content}
-                    </div>
-                    <div className={styles.fbMeta}>{fb.author}</div>
-                    <select className={`${styles.fbStatus} ${styles['st'+fb.status]}`} value={fb.status} onChange={e=>updateStatus(fb.id,e.target.value)}>
-                      <option value="待处理">待处理</option><option value="讨论中">讨论中</option><option value="已处理">已处理</option>
-                    </select>
-                  </div>
-                )
-              })}
-              {active==='version' && (
-                <div>
-                  <select value={verA} onChange={e=>setVerA(e.target.value)} className={styles.verSelect}><option value="">旧版本</option>{materials.map(m=><option key={m.id} value={m.id}>{m.displayName||m.originalName}</option>)}</select>
-                  <div style={{textAlign:'center',padding:'8px 0',fontWeight:700,color:'var(--text-muted)'}}>VS</div>
-                  <select value={verB} onChange={e=>setVerB(e.target.value)} className={styles.verSelect}><option value="">新版本</option>{materials.map(m=><option key={m.id} value={m.id}>{m.displayName||m.originalName}</option>)}</select>
-                </div>
-              )}
+      {confirmBox && (
+        <div className={styles.confirmMask} onClick={()=>setConfirmBox(null)}>
+          <div className={styles.confirmBox} style={{left:confirmBox.x, top:confirmBox.y}} onClick={e=>e.stopPropagation()}>
+            <div className={styles.confirmMsg}>{confirmBox.message}</div>
+            <div className={styles.confirmBtns}>
+              <button className={styles.vcTextCancel} onClick={()=>setConfirmBox(null)}>取消</button>
+              <button className={styles.confirmOk} onClick={()=>{confirmBox.onConfirm(); setConfirmBox(null)}}>确定</button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {libPicker && (
+        <div className={styles.modalMask} onClick={()=>{setLibPicker(false);setLibPickSet(new Set());setLibCat('all')}}>
+          <div className={styles.libModal} onClick={e=>e.stopPropagation()}>
+            <div className={styles.libTitle}>
+              <span>🗂️ 从素材库选择素材</span>
+              <span style={{fontSize:11,color:'#64748b'}}>已选 {libPickSet.size} 项</span>
+            </div>
+            <div className={styles.libBody}>
+              <div className={styles.libCats}>
+                <div className={`${styles.libCatItem} ${libCat==='all'?styles.libCatOn:''}`} onClick={()=>setLibCat('all')}>
+                  📦 全部素材 <span className={styles.libCatCount}>{materials.length}</span>
+                </div>
+                {rootCats.map(cat => (
+                  <div key={cat.id} className={`${styles.libCatItem} ${libCat===cat.id?styles.libCatOn:''}`} onClick={()=>setLibCat(cat.id)}>
+                    📁 {cat.name} <span className={styles.libCatCount}>{collectCatIds(cat.id).length}</span>
+                  </div>
+                ))}
+                {state.categories.filter(c => c.parentId).map(cat => (
+                  <div key={cat.id} className={`${styles.libCatItem} ${styles.libCatChild} ${libCat===cat.id?styles.libCatOn:''}`} onClick={()=>setLibCat(cat.id)}>
+                    📄 {cat.name} <span className={styles.libCatCount}>{collectCatIds(cat.id).length}</span>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.libList}>
+                {libMaterials.map(m => (
+                  <div key={m.id} className={`${styles.libItem} ${libPickSet.has(m.id)?styles.libItemOn:''}`}
+                    onClick={()=>toggleLibPick(m.id)}>
+                    <span className={styles.libCheck}>{libPickSet.has(m.id)?'✓':''}</span>
+                    <span>{m.type==='video'?'🎬':'🖼️'}</span>
+                    <span className={styles.matName}>{m.displayName||m.originalName}</span>
+                  </div>
+                ))}
+                {libMaterials.length === 0 && <div className={styles.emptyTxt}>该分类暂无素材</div>}
+              </div>
+            </div>
+            <div className={styles.libFooter}>
+              <button className={styles.libCancel} onClick={()=>{setLibPicker(false);setLibPickSet(new Set());setLibCat('all')}}>取消</button>
+              <button className={styles.libOk} onClick={confirmLibPick} disabled={libPickSet.size===0}>确认导入 ({libPickSet.size})</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

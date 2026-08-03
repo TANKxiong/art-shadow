@@ -41,7 +41,12 @@ function AppLayout() {
   }
 
   if (module === 'feedback') {
-    return <FeedbackRoom onBack={() => setModule(null)} />
+    return (
+      <>
+        <FeedbackRoom onBack={() => setModule(null)} />
+        <PreviewModal />
+      </>
+    )
   }
 
   return (
