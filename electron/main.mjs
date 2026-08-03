@@ -2,7 +2,7 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import http from 'node:http'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
