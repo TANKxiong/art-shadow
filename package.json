@@ -14,11 +14,11 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@vitejs/plugin-react": "^6.0.4",
     "concurrently": "^10.0.4",
     "electron": "^31.7.7",

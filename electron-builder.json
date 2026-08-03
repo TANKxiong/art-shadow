@@ -7,11 +7,21 @@
   "files": [
     "dist/**/*",
     "electron/**/*",
-    "package.json",
-    "node_modules/@ffmpeg-installer/**/*"
+    "package.json"
   ],
   "asarUnpack": [
-    "node_modules/@ffmpeg-installer/**/*"
+    "node_modules/@ffmpeg-installer/ffmpeg/**/*",
+    "node_modules/@ffmpeg-installer/win32-x64/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "node_modules/@ffmpeg-installer/ffmpeg",
+      "to": "ffmpeg/ffmpeg"
+    },
+    {
+      "from": "node_modules/@ffmpeg-installer/win32-x64",
+      "to": "ffmpeg/win32-x64"
+    }
   ],
   "win": {
     "target": "portable"

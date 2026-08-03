@@ -20,6 +20,17 @@ try {
     const unpacked = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
     if (fs.existsSync(unpacked)) ffmpegPath = unpacked
   }
+  if (!fs.existsSync(ffmpegPath)) {
+    // Fallback: extraResources copy at resources/ffmpeg
+    const binName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+    const candidates = [
+      path.join(process.resourcesPath, 'ffmpeg', 'win32-x64', binName),
+      path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg', 'bin', process.platform, process.arch, binName),
+      path.join(process.resourcesPath, 'ffmpeg', binName)
+    ]
+    for (const c of candidates) { if (fs.existsSync(c)) { ffmpegPath = c; break } }
+    console.log('FFmpeg fallback candidates:', candidates, '=>', ffmpegPath)
+  }
 } catch(e) { console.error('FFmpeg load failed:', e) }
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
