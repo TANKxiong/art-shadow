@@ -28,9 +28,19 @@ const MODULES = [
   }
 ]
 
-const APP_VERSION = '1.1.0'
+const APP_VERSION = '1.2.0'
 
 const CHANGELOG = [
+  {
+    version: '1.2.0',
+    date: '2026-08-03',
+    title: '全格式视频支持',
+    items: [
+      '支持几乎所有视频格式导入：MP4/AVI/MKV/WMV/FLV/MOV/TS/M2TS/3GP/RMVB/MPG/ASF/MXF 等',
+      '导入时自动用 FFmpeg 转码为通用 MP4，保证打包版也能播放',
+      '转码失败自动降级（无音轨视频也能转），并提示具体失败文件'
+    ]
+  },
   {
     version: '1.1.0',
     date: '2026-08-03',

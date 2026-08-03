@@ -43,26 +43,32 @@ function ensureDirs() {
   if (!fs.existsSync(materialsDir)) fs.mkdirSync(materialsDir, { recursive: true })
 }
 
+// All video extensions we accept; every video is transcoded to H.264 MP4 for Chromium
+const VIDEO_EXTS = ['.mp4','.webm','.mov','.avi','.mkv','.wmv','.flv','.m4v','.ts','.m2ts','.mts','.3gp','.3g2','.ogv','.ogg','.rm','.rmvb','.vob','.mpg','.mpeg','.asf','.mxf','.dv','.f4v','.nut']
+
 // Transcode video to H.264 MP4 for compatibility
 function transcode(inputPath, outputPath) {
   if (!ffmpegPath) return Promise.reject(new Error('FFmpeg not available'))
   return new Promise((resolve, reject) => {
-    execFile(ffmpegPath, [
-      '-y', '-i', inputPath,
-      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-      '-c:a', 'aac', '-b:a', '128k',
-      '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-      outputPath
-    ], { timeout: 120000 }, (err) => {
-      if (err) reject(err)
-      else resolve()
-    })
+    // Try with audio first; if that fails (no audio stream etc), retry without audio
+    const run = (audio) => {
+      const args = ['-y', '-i', inputPath]
+      if (audio) args.push('-c:a', 'aac', '-b:a', '128k')
+      args.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23')
+      args.push('-pix_fmt', 'yuv420p', '-movflags', '+faststart', outputPath)
+      execFile(ffmpegPath, args, { timeout: 180000 }, (err) => {
+        if (err && audio) run(false)
+        else if (err) reject(err)
+        else resolve()
+      })
+    }
+    run(true)
   })
 }
 
 // HTTP server for material files
 function startFileServer() {
-  const mime = { '.mp4':'video/mp4','.webm':'video/webm','.mov':'video/quicktime','.mkv':'video/x-matroska','.avi':'video/x-msvideo','.jpg':'image/jpeg','.png':'image/png','.gif':'image/gif' }
+  const mime = { '.mp4':'video/mp4','.webm':'video/webm','.mov':'video/quicktime','.mkv':'video/x-matroska','.avi':'video/x-msvideo','.ts':'video/mp2t','.m2ts':'video/mp2t','.mts':'video/mp2t','.flv':'video/x-flv','.wmv':'video/x-ms-wmv','.mpg':'video/mpeg','.mpeg':'video/mpeg','.ogv':'video/ogg','.3gp':'video/3gpp','.rmvb':'video/vnd.rn-realvideo','.jpg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.bmp':'image/bmp' }
   try {
     httpServer = http.createServer((req, res) => {
       const filePath = path.join(materialsDir, decodeURIComponent(req.url.slice(1)))
@@ -88,7 +94,7 @@ ipcMain.handle('data:save', (_, data) => { saveData(data); return { success: tru
 
 ipcMain.handle('dialog:openFiles', async () => {
   const r = await dialog.showOpenDialog(mainWindow, {
-    title: '导入素材', filters: [{ name: '媒体文件', extensions: ['mp4','webm','mov','avi','mkv','wmv','flv','m4v','jpg','jpeg','png','gif','webp','bmp'] }],
+    title: '导入素材', filters: [{ name: '媒体文件', extensions: ['mp4','webm','mov','avi','mkv','wmv','flv','m4v','ts','m2ts','mts','3gp','3g2','ogv','ogg','rm','rmvb','vob','mpg','mpeg','asf','mxf','dv','f4v','nut','jpg','jpeg','png','gif','webp','bmp'] }],
     properties: ['openFile', 'multiSelections']
   })
   if (r.canceled) return []
@@ -96,10 +102,11 @@ ipcMain.handle('dialog:openFiles', async () => {
   const results = []
   for (const fp of r.filePaths) {
     const ext = path.extname(fp).toLowerCase()
-    const isVideo = ['.mp4','.webm','.mov','.avi','.mkv','.wmv','.flv','.m4v'].includes(ext)
+    const isVideo = VIDEO_EXTS.includes(ext)
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
     let destPath = fp
     let newName = path.basename(fp)
+    let transcodeError = null
     // For videos, try to ensure playability with FFmpeg
     if (isVideo && ffmpegPath) {
       const dest = path.join(materialsDir, id + '.mp4')
@@ -108,21 +115,25 @@ ipcMain.handle('dialog:openFiles', async () => {
         destPath = dest
         newName = id + '.mp4'
       } catch(e) {
-        // Transcode failed, copy original
+        // Transcode failed, copy original (may not play, but preserve file)
+        transcodeError = (e && e.message ? e.message : String(e)).slice(0, 300)
         const dest2 = path.join(materialsDir, id + ext)
-        fs.copyFileSync(fp, dest2)
-        destPath = dest2
-        newName = id + ext
+        try { fs.copyFileSync(fp, dest2); destPath = dest2; newName = id + ext } catch(e2) {
+          console.error('copy failed', e2)
+          continue
+        }
       }
     } else {
       const dest = path.join(materialsDir, id + ext)
-      fs.copyFileSync(fp, dest)
-      destPath = dest
-      newName = id + ext
+      try { fs.copyFileSync(fp, dest); destPath = dest; newName = id + ext } catch(e) {
+        console.error('copy failed', e)
+        continue
+      }
     }
     results.push({
       id, originalName: path.basename(fp), fileName: newName,
       type: isVideo ? 'video' : 'image',
+      transcodeError,
       size: fs.statSync(destPath).size, categoryId: null, tags: [], source: '', notes: '',
       importedAt: new Date().toISOString()
     })

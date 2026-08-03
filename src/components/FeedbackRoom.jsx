@@ -2,6 +2,45 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store/StoreContext'
 import styles from '../styles/FeedbackRoom.module.css'
 
+// IndexedDB helper: persist local File/Blob objects so room materials survive remounts
+const IDB_NAME = 'artshadow-room'
+const IDB_STORE = 'files'
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1)
+    req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(IDB_STORE)) req.result.createObjectStore(IDB_STORE) }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+async function idbPut(key, value) {
+  const db = await idbOpen()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).put(value, key)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+async function idbGet(key) {
+  const db = await idbOpen()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly')
+    const req = tx.objectStore(IDB_STORE).get(key)
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+async function idbDel(key) {
+  const db = await idbOpen()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).delete(key)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
 export default function FeedbackRoom({ onBack }) {
   const { state, dispatch } = useStore()
   const { materials } = state
@@ -24,6 +63,36 @@ export default function FeedbackRoom({ onBack }) {
   })
   const saveRoomMatData = (data) => { setRoomMatData(data); localStorage.setItem('artshadow-roommatdata', JSON.stringify(Object.fromEntries(Object.entries(data).map(([k,v])=>{ const {_file, ...rest} = v; return [k, rest] })))) }
   const roomMaterial = (id) => roomMatData[id] || materials.find(m => m.id === id)
+
+  const removeRoomMats = (ids) => {
+    saveRoomMats(roomMats.filter(x => !ids.includes(x)))
+    // clean IndexedDB file bodies for removed local materials
+    const data = { ...roomMatData }
+    ids.forEach(id => {
+      if (data[id] && data[id]._idbOnly !== undefined) { /* placeholder */ }
+      delete data[id]
+      idbDel(id).catch(()=>{})
+    })
+    saveRoomMatData(data)
+  }
+
+  // On mount: restore persisted local files from IndexedDB so playback works after re-entering
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const keys = Object.keys(roomMatData)
+        if (keys.length === 0) return
+        const updates = {}
+        for (const id of keys) {
+          const blob = await idbGet(id)
+          if (blob && !cancelled) updates[id] = { ...roomMatData[id], _file: blob }
+        }
+        if (!cancelled && Object.keys(updates).length > 0) setRoomMatData(prev => ({ ...prev, ...updates }))
+      } catch(e) { console.error('idb restore failed', e) }
+    })()
+    return () => { cancelled = true }
+  }, [])
   const [confirmBox, setConfirmBox] = useState(null) // {x,y,message,onConfirm}
   const [multiMode, setMultiMode] = useState(false)
   const [selSet, setSelSet] = useState(new Set())
@@ -41,16 +110,35 @@ export default function FeedbackRoom({ onBack }) {
   const rootCats = state.categories.filter(c => !c.parentId)
 
   const handleImport = () => {
+    // In Electron, use native dialog which transcodes videos to MP4 for compatibility
+    if (window.electronAPI) {
+      window.electronAPI.openFiles().then(files => {
+        if (!files || files.length === 0) return
+        const norm = files.map(f => ({ ...f, name: f.originalName || '', type: f.type === 'video' ? 'video/mp4' : 'image/jpeg', _isElectron: true }))
+        const data = { ...roomMatData }
+        norm.forEach(m => { data[m.id] = m })
+        saveRoomMatData(data)
+        saveRoomMats([...new Set([...roomMats, ...norm.map(m=>m.id)])])
+        // warn if some videos failed to transcode
+        const failed = norm.filter(m => m.transcodeError)
+        if (failed.length > 0) alert('有 ' + failed.length + ' 个视频转码失败，可能无法播放（原文件已保留）：\n' + failed.map(f=>f.originalName).join('、'))
+      }).catch(e => console.error('Electron import failed:', e))
+      return
+    }
     const inp = document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='video/*,image/*'
-    inp.onchange = e => {
+    inp.onchange = async e => {
       const arr = Array.from(e.target.files).map(f => ({
         id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
         originalName:f.name,type:f.type.startsWith('video/')?'video':'image',
         size:f.size,categoryId:null,importedAt:new Date().toISOString(),_file:f
       }))
       // Keep local imports in the feedback room only (not added to library store)
+      // Persist file bodies in IndexedDB so they survive leaving/re-entering the room
       const data = { ...roomMatData }
-      arr.forEach(m => { data[m.id] = m })
+      for (const m of arr) {
+        data[m.id] = { ...m, _file: undefined }
+        try { await idbPut(m.id, m._file) } catch(err) { console.error('idb put failed', err) }
+      }
       saveRoomMatData(data)
       saveRoomMats([...new Set([...roomMats, ...arr.map(m=>m.id)])])
     }
@@ -720,7 +808,7 @@ export default function FeedbackRoom({ onBack }) {
                     onClick={e=>{
                       const pos = e.currentTarget.getBoundingClientRect()
                       setConfirmBox({ x: pos.left, y: pos.bottom, message:`确定删除选中的 ${selSet.size} 个素材？`, onConfirm:()=>{
-                        saveRoomMats(roomMats.filter(x=>!selSet.has(x)))
+                        removeRoomMats([...selSet])
                         setSelSet(new Set()); setMultiMode(false)
                       }})
                     }} disabled={selSet.size===0}>删除({selSet.size})</button>
@@ -753,7 +841,7 @@ export default function FeedbackRoom({ onBack }) {
                   <button className={styles.matDel} onClick={e=>{
                     e.stopPropagation()
                     const pos = e.currentTarget.getBoundingClientRect()
-                    setConfirmBox({ x: pos.left, y: pos.bottom, message:'从反馈室移除？', onConfirm:()=>saveRoomMats(roomMats.filter(x=>x!==m.id)) })
+                    setConfirmBox({ x: pos.left, y: pos.bottom, message:'从反馈室移除？', onConfirm:()=>removeRoomMats([m.id]) })
                   }}>×</button>
                 </div>
               )
