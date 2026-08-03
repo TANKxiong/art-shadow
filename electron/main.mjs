@@ -14,23 +14,21 @@ let httpServer = null
 // Try to load FFmpeg, silently fall back if not available
 let ffmpegPath = null
 try {
-  ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
-  // In packaged app, binary must be unpacked outside asar archive
-  if (ffmpegPath.includes('app.asar') && !fs.existsSync(ffmpegPath)) {
-    const unpacked = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
-    if (fs.existsSync(unpacked)) ffmpegPath = unpacked
+  const binName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  // Preferred: extraResources copy (real filesystem, spawn-safe)
+  const preferred = [
+    path.join(process.resourcesPath, 'ffmpeg', 'win32-x64', binName),
+    path.join(process.resourcesPath, 'ffmpeg', binName)
+  ]
+  for (const c of preferred) { if (fs.existsSync(c)) { ffmpegPath = c; break } }
+  // Fallback: module path, redirect asar -> asar.unpacked (fs.existsSync lies for asar)
+  if (!ffmpegPath) {
+    let p = require('@ffmpeg-installer/ffmpeg').path
+    if (p.includes('app.asar')) p = p.replace('app.asar', 'app.asar.unpacked')
+    if (fs.existsSync(p)) ffmpegPath = p
   }
-  if (!fs.existsSync(ffmpegPath)) {
-    // Fallback: extraResources copy at resources/ffmpeg
-    const binName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
-    const candidates = [
-      path.join(process.resourcesPath, 'ffmpeg', 'win32-x64', binName),
-      path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg', 'bin', process.platform, process.arch, binName),
-      path.join(process.resourcesPath, 'ffmpeg', binName)
-    ]
-    for (const c of candidates) { if (fs.existsSync(c)) { ffmpegPath = c; break } }
-    console.log('FFmpeg fallback candidates:', candidates, '=>', ffmpegPath)
-  }
+  console.log('FFmpeg path:', ffmpegPath || 'NOT FOUND')
+} catch(e) { console.error('FFmpeg load failed:', e) }
 } catch(e) { console.error('FFmpeg load failed:', e) }
 
 const dataDir = path.join(app.getPath('userData'), 'ArtShadow')
