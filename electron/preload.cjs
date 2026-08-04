@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAllData: () => ipcRenderer.invoke('data:getAll'),
   saveData: (data) => ipcRenderer.invoke('data:save', data),
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
+  openFilesWithPaths: (paths) => ipcRenderer.invoke('dialog:openFilesWithPaths', paths),
   getMaterialPath: (fileName) => ipcRenderer.invoke('materials:getPath', fileName),
   getMaterialsDir: () => ipcRenderer.invoke('settings:getMaterialsDir'),
   setMaterialsDir: () => ipcRenderer.invoke('settings:setMaterialsDir'),

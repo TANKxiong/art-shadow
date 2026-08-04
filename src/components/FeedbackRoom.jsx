@@ -127,23 +127,46 @@ export default function FeedbackRoom({ onBack }) {
       return
     }
     const inp = document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='video/*,image/*'
-    inp.onchange = async e => {
-      const arr = Array.from(e.target.files).map(f => ({
-        id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-        originalName:f.name,type:f.type.startsWith('video/')?'video':'image',
-        size:f.size,categoryId:null,importedAt:new Date().toISOString(),_file:f
-      }))
-      // Keep local imports in the feedback room only (not added to library store)
-      // Persist file bodies in IndexedDB so they survive leaving/re-entering the room
-      const data = { ...roomMatData }
-      for (const m of arr) {
-        data[m.id] = { ...m, _file: undefined }
-        try { await idbPut(m.id, m._file) } catch(err) { console.error('idb put failed', err) }
-      }
-      saveRoomMatData(data)
-      saveRoomMats([...new Set([...roomMats, ...arr.map(m=>m.id)])])
-    }
+    inp.onchange = e => { if (e.target.files) importFiles(e.target.files) }
     inp.click()
+  }    
+
+  // 导入本地文件（FileList / File[]）到反馈室（浏览器路径，文件存 IndexedDB）
+  const importFiles = async (fileList) => {
+    const files = Array.from(fileList || [])
+    if (files.length === 0) return []
+    const arr = files.map(f => ({
+      id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      originalName:f.name,type:(f.type||'').startsWith('video/')?'video':'image',
+      size:f.size,categoryId:null,importedAt:new Date().toISOString(),_file:f
+    }))
+    const data = { ...roomMatData }
+    for (const m of arr) {
+      data[m.id] = { ...m, _file: undefined }
+      try { await idbPut(m.id, m._file) } catch(err) { console.error('idb put failed', err) }
+    }
+    saveRoomMatData(data)
+    saveRoomMats([...new Set([...roomMats, ...arr.map(m=>m.id)])])
+    return arr
+  }
+  // Electron：系统拖拽文件 → 通过原生转码导入（File.path 真实路径）
+  const importDroppedFiles = async (fileList) => {
+    const files = Array.from(fileList || [])
+    if (files.length === 0) return
+    const paths = files.map(f => f.path).filter(Boolean)
+    if (paths.length === 0) { importFiles(fileList); return }
+    try {
+      const results = await window.electronAPI.openFilesWithPaths(paths)
+      if (results && results.length > 0) {
+        const norm = results.map(f => ({ ...f, name: f.originalName || '', type: f.type === 'video' ? 'video/mp4' : 'image/jpeg', _isElectron: true }))
+        const data = { ...roomMatData }
+        norm.forEach(m => { data[m.id] = m })
+        saveRoomMatData(data)
+        saveRoomMats([...new Set([...roomMats, ...norm.map(m=>m.id)])])
+        const failed = norm.filter(m => m.transcodeError)
+        if (failed.length > 0) alert('有 ' + failed.length + ' 个视频转码失败（原文件已保留）：\n' + failed.map(f=>f.originalName).join('、'))
+      }
+    } catch(e) { console.error('Electron drop import failed:', e) }
   }
 
   const confirmLibPick = () => {
@@ -164,10 +187,55 @@ export default function FeedbackRoom({ onBack }) {
   const handleDragStart = (e, m) => { e.dataTransfer.setData('materialId', m.id) }
   const handleDrop = (e) => {
     e.preventDefault()
+    // 系统文件拖拽 → 导入素材
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      if (window.electronAPI) {
+        // Electron：拖拽的文件路径转成 File 对象
+        importDroppedFiles(e.dataTransfer.files)
+      } else {
+        importFiles(e.dataTransfer.files)
+      }
+      return
+    }
     const id = e.dataTransfer.getData('materialId')
     if (id) { const m = materials.find(m => m.id === id); if (m) dispatch({type:'SET_PREVIEW',payload:m}) }
   }
   const handleDragOver = e => e.preventDefault()
+
+  // 版本对比预览框拖入：替换该侧素材（支持内部素材 + 系统文件）
+  const handleVcDrop = (side, e) => {
+    e.preventDefault(); e.stopPropagation()
+    // 系统文件拖入 → 导入并设为该侧
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const doSet = (ids) => {
+        if (ids.length > 0) { if (side === 'A') setVerA(ids[0]); else setVerB(ids[0]) }
+      }
+      if (window.electronAPI) {
+        const paths = Array.from(e.dataTransfer.files).map(f => f.path).filter(Boolean)
+        if (paths.length > 0) {
+          window.electronAPI.openFilesWithPaths(paths).then(results => {
+            if (results && results.length > 0) {
+              const norm = results.map(f => ({ ...f, name: f.originalName || '', type: f.type === 'video' ? 'video/mp4' : 'image/jpeg', _isElectron: true }))
+              const data = { ...roomMatData }
+              norm.forEach(m => { data[m.id] = m })
+              saveRoomMatData(data)
+              saveRoomMats([...new Set([...roomMats, ...norm.map(m=>m.id)])])
+              doSet(norm.map(m => m.id))
+            }
+          })
+          return
+        }
+      }
+      importFiles(e.dataTransfer.files).then(imported => {
+        const ids = (imported || []).map(m => m.id)
+        doSet(ids.length > 0 ? ids : Object.keys(JSON.parse(localStorage.getItem('artshadow-roommatdata') || '{}')))
+      })
+      return
+    }
+    // 内部素材拖入
+    const id = e.dataTransfer.getData('materialId')
+    if (id) { if (side === 'A') setVerA(id); else setVerB(id) }
+  }
 
   const [verA, setVerA] = useState(''); const [verB, setVerB] = useState('')
   const matA = roomMaterial(verA); const matB = roomMaterial(verB)
@@ -229,15 +297,24 @@ export default function FeedbackRoom({ onBack }) {
   const vbRef = useRef(null)
   const vcSyncRef = useRef(0)
 
-  const resolveSrc = (m, setSrc) => {
+  const resolveSrc = async (m, setSrc) => {
     if (!m) { setSrc(null); return }
+    // Electron：本地文件路径
     if (window.electronAPI && m.fileName) {
-      window.electronAPI.getMaterialPath(m.fileName).then(p => setSrc(p))
-    } else if (m._file) {
-      setSrc(URL.createObjectURL(m._file))
-    } else if (m.embedUrl) {
-      setSrc(m.embedUrl)
-    } else { setSrc(null) }
+      const p = await window.electronAPI.getMaterialPath(m.fileName)
+      setSrc(p || null)
+      return
+    }
+    // File/Blob
+    if (m._file instanceof Blob) { setSrc(URL.createObjectURL(m._file)); return }
+    if (m._blobUrl) { setSrc(m._blobUrl); return }
+    if (m.embedUrl) { setSrc(m.embedUrl); return }
+    // 兜底：从 IndexedDB 恢复文件（素材库导入的素材可能只有 id）
+    try {
+      const blob = await idbGet(m.id)
+      if (blob instanceof Blob) { setSrc(URL.createObjectURL(blob)); return }
+    } catch(e) {}
+    setSrc(null)
   }
 
   useEffect(() => {
@@ -1018,7 +1095,7 @@ export default function FeedbackRoom({ onBack }) {
   }, [vcDraw, vcMode])
 
   return (
-    <div className={styles.room}>
+    <div className={styles.room} onDragOver={handleDragOver} onDrop={handleDrop}>
       <div className={styles.topBar}>
         <button className={styles.backBtn} onClick={onBack}>← 返回首页</button>
         <div className={styles.topTitle}>💬 反馈室</div>
@@ -1118,29 +1195,28 @@ export default function FeedbackRoom({ onBack }) {
                   })}
                 </select>
               </div>
-              {(!matA || !matB) ? (
-                <div className={styles.vcHint}>👆 分别选择旧/新版本素材，生成对比</div>
-              ) : (
-                <div className={styles.vcPanel}>
-                  <div className={styles.vcModeBar}>
-                    <button className={`${styles.vcModeBtn} ${vcMode==='side'?styles.vcModeOn:''}`} onClick={()=>setVcMode('side')}>↔️ 横向对比</button>
-                    <button className={`${styles.vcModeBtn} ${vcMode==='stack'?styles.vcModeOn:''}`} onClick={()=>setVcMode('stack')}>↕️ 上下对比</button>
-                    <button className={`${styles.vcModeBtn} ${vcMode==='overlay'?styles.vcModeOn:''}`} onClick={()=>setVcMode('overlay')}>🔀 重叠对比</button>
+              <div className={styles.vcPanel}>
+                <div className={styles.vcModeBar}>
+                  <button className={`${styles.vcModeBtn} ${vcMode==='side'?styles.vcModeOn:''}`} onClick={()=>setVcMode('side')}>↔️ 横向对比</button>
+                  <button className={`${styles.vcModeBtn} ${vcMode==='stack'?styles.vcModeOn:''}`} onClick={()=>setVcMode('stack')}>↕️ 上下对比</button>
+                  <button className={`${styles.vcModeBtn} ${vcMode==='overlay'?styles.vcModeOn:''}`} onClick={()=>setVcMode('overlay')}>🔀 重叠对比</button>
+                </div>
+                <div className={`${styles.vcVideos} ${vcMode==='stack'?styles.vcStack:''} ${vcMode==='overlay'?styles.vcOverlay:''}`}>
+                  <div className={`${styles.vcBox} ${styles.vcDropBox}`} onDrop={e=>handleVcDrop('A', e)} onDragOver={e=>{e.preventDefault();e.stopPropagation()}}>
+                    <div className={styles.vcLabel}>旧版本</div>
+                    {matA ? (vaSrc
+                      ? <video ref={vaRef} src={vaSrc} onLoadedMetadata={e=>setVaDur(e.target.duration||0)} onTimeUpdate={onVaTime} onEnded={onVcEnded} style={vcMode==='overlay'?{opacity:vaOpacity}:undefined} />
+                      : <div className={styles.vcPlaceholder}>无法加载</div>)
+                      : <div className={styles.vcPlaceholder}>🎬 拖入旧版本素材</div>}
                   </div>
-                  <div className={`${styles.vcVideos} ${vcMode==='stack'?styles.vcStack:''} ${vcMode==='overlay'?styles.vcOverlay:''}`}>
-                    <div className={styles.vcBox}>
-                      <div className={styles.vcLabel}>旧版本</div>
-                      {vaSrc
-                        ? <video ref={vaRef} src={vaSrc} onLoadedMetadata={e=>setVaDur(e.target.duration||0)} onTimeUpdate={onVaTime} onEnded={onVcEnded} style={vcMode==='overlay'?{opacity:vaOpacity}:undefined} />
-                        : <div className={styles.vcPlaceholder}>无法加载</div>}
-                    </div>
-                    <div className={styles.vcBox}>
-                      <div className={styles.vcLabel}>新版本</div>
-                      {vbSrc
-                        ? <video ref={vbRef} src={vbSrc} onLoadedMetadata={e=>setVbDur(e.target.duration||0)} onEnded={onVcEnded} style={vcMode==='overlay'?{opacity:vbOpacity}:undefined} />
-                        : <div className={styles.vcPlaceholder}>无法加载</div>}
-                    </div>
-                    {vcMode==='overlay' && (
+                  <div className={`${styles.vcBox} ${styles.vcDropBox}`} onDrop={e=>handleVcDrop('B', e)} onDragOver={e=>{e.preventDefault();e.stopPropagation()}}>
+                    <div className={styles.vcLabel}>新版本</div>
+                    {matB ? (vbSrc
+                      ? <video ref={vbRef} src={vbSrc} onLoadedMetadata={e=>setVbDur(e.target.duration||0)} onEnded={onVcEnded} style={vcMode==='overlay'?{opacity:vbOpacity}:undefined} />
+                      : <div className={styles.vcPlaceholder}>无法加载</div>)
+                      : <div className={styles.vcPlaceholder}>🎬 拖入新版本素材</div>}
+                  </div>
+                  {vcMode==='overlay' && (
                       <div className={styles.vcOpacityBar}>
                         <div className={styles.vcOpacityTitle}>透明度</div>
                         <div className={styles.vcOpacityRow}>
@@ -1251,7 +1327,6 @@ export default function FeedbackRoom({ onBack }) {
                     <span className={styles.vcFrameLabel}>帧</span>
                   </div>
                 </div>
-              )}
             </div>
           ) : active==='clip' ? (
             <ClipEditor roomMaterial={roomMaterial} roomMats={roomMats} onImport={handleImport} />

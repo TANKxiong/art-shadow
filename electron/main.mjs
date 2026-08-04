@@ -93,15 +93,11 @@ function saveData(data) { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)
 ipcMain.handle('data:getAll', () => loadData())
 ipcMain.handle('data:save', (_, data) => { saveData(data); return { success: true } })
 
-ipcMain.handle('dialog:openFiles', async () => {
-  const r = await dialog.showOpenDialog(mainWindow, {
-    title: '导入素材', filters: [{ name: '媒体文件', extensions: ['mp4','webm','mov','avi','mkv','wmv','flv','m4v','ts','m2ts','mts','3gp','3g2','ogv','ogg','rm','rmvb','vob','mpg','mpeg','asf','mxf','dv','f4v','nut','jpg','jpeg','png','gif','webp','bmp'] }],
-    properties: ['openFile', 'multiSelections']
-  })
-  if (r.canceled) return []
+// 处理一批文件路径：视频转码/图片复制，返回素材对象数组
+async function importPaths(filePaths) {
   ensureDirs()
   const results = []
-  for (const fp of r.filePaths) {
+  for (const fp of filePaths) {
     const ext = path.extname(fp).toLowerCase()
     const isVideo = VIDEO_EXTS.includes(ext)
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
@@ -140,6 +136,21 @@ ipcMain.handle('dialog:openFiles', async () => {
     })
   }
   return results
+}
+
+ipcMain.handle('dialog:openFiles', async () => {
+  const r = await dialog.showOpenDialog(mainWindow, {
+    title: '导入素材', filters: [{ name: '媒体文件', extensions: ['mp4','webm','mov','avi','mkv','wmv','flv','m4v','ts','m2ts','mts','3gp','3g2','ogv','ogg','rm','rmvb','vob','mpg','mpeg','asf','mxf','dv','f4v','nut','jpg','jpeg','png','gif','webp','bmp'] }],
+    properties: ['openFile', 'multiSelections']
+  })
+  if (r.canceled) return []
+  return importPaths(r.filePaths)
+})
+
+// 系统文件拖拽导入：接收文件路径数组（来自 renderer 拖拽的 File.path）
+ipcMain.handle('dialog:openFilesWithPaths', async (_, filePaths) => {
+  if (!Array.isArray(filePaths) || filePaths.length === 0) return []
+  return importPaths(filePaths)
 })
 
 ipcMain.handle('materials:getPath', (_, fileName) => {

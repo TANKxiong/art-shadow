@@ -10,8 +10,22 @@ export default function MaterialGrid() {
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState(new Set())
 
-  const importFiles = (files) => {
-    const mediaFiles = Array.from(files).filter(f =>
+  const importFiles = async (files) => {
+    const fileArr = Array.from(files)
+    // Electron 拖拽：File 对象带 .path，走原生转码导入（保证打包版可播放）
+    if (window.electronAPI && fileArr[0] && fileArr[0].path) {
+      try {
+        const results = await window.electronAPI.openFilesWithPaths(fileArr.map(f => f.path))
+        if (results && results.length > 0) {
+          const norm = results.map(f => ({ ...f, name: f.originalName || '', type: f.type === 'video' ? 'video/mp4' : 'image/jpeg', _isElectron: true }))
+          dispatch({ type: 'ADD_MATERIALS', payload: norm })
+          const failed = norm.filter(f => f.transcodeError)
+          if (failed.length > 0) alert('有 ' + failed.length + ' 个视频转码失败（原文件已保留）：\n' + failed.map(f=>f.originalName).join('、'))
+        }
+      } catch(e) { console.error('Electron drop import failed:', e) }
+      return
+    }
+    const mediaFiles = fileArr.filter(f =>
       f.type.startsWith('video/') || f.type.startsWith('image/')
     )
     if (mediaFiles.length === 0) return
