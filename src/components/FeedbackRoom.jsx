@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store/StoreContext'
 import styles from '../styles/FeedbackRoom.module.css'
+import ClipEditor from './ClipEditor'
 
 // IndexedDB helper: persist local File/Blob objects so room materials survive remounts
 const IDB_NAME = 'artshadow-room'
@@ -197,6 +198,11 @@ export default function FeedbackRoom({ onBack }) {
   const [vcLoopStart, setVcLoopStart] = useState(0)
   const [vcMouse, setVcMouse] = useState(null)
   const [vcDownloading, setVcDownloading] = useState(false)
+  // ---- Clip track ----
+  const [clips, setClips] = useState(() => { try { return JSON.parse(localStorage.getItem('artshadow-clips')||'[]') } catch { return [] } })
+  const saveClips = (arr) => { setClips(arr); localStorage.setItem('artshadow-clips', JSON.stringify(arr)) }
+  const addClip = (mId) => { const m = roomMaterial(mId); if (!m) return; saveClips([...clips,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),materialId:mId,dur:5}]) }
+  const removeClip = (id) => { saveClips(clips.filter(c=>c.id!==id)) }
   const vcCanvasRef = useRef(null)
   const vcDrawingRef = useRef(false)
   const vcLastPosRef = useRef(null)
@@ -1017,7 +1023,8 @@ export default function FeedbackRoom({ onBack }) {
         <button className={styles.backBtn} onClick={onBack}>← 返回首页</button>
         <div className={styles.topTitle}>💬 反馈室</div>
         <div className={styles.topTabs}>
-          <button className={`${styles.topTab} ${styles.topTabOn}`}>🔄 版本对比</button>
+          <button className={`${styles.topTab} ${active==='version'?styles.topTabOn:''}`} onClick={()=>setActive('version')}>🔄 版本对比</button>
+          <button className={`${styles.topTab} ${active==='clip'?styles.topTabOn:''}`} onClick={()=>setActive('clip')}>🎬 剪辑轨道</button>
         </div>
         <div style={{position:'relative'}}>
           <button className={styles.importBtn} onClick={()=>setImportMenu(!importMenu)}>+ 导入素材</button>
@@ -1033,6 +1040,8 @@ export default function FeedbackRoom({ onBack }) {
       </div>
 
       <div className={styles.body}>
+        {active==='version' && (
+        <>
         <div className={`${styles.leftPanel} ${showLeft?styles.leftOpen:''}`}
           onMouseEnter={()=>{clearTimeout(hideLeftTimer.current);setShowLeft(true)}}
           onMouseLeave={()=>{hideLeftTimer.current=setTimeout(()=>setShowLeft(false),300)}}>
@@ -1086,6 +1095,8 @@ export default function FeedbackRoom({ onBack }) {
           </div>
         </div>
         <div className={styles.edgeZone} onMouseEnter={()=>{clearTimeout(hideLeftTimer.current);setShowLeft(true)}} title="靠近显示素材列表" />
+        </>
+        )}
 
         <div className={styles.centerPanel} onDrop={handleDrop} onDragOver={handleDragOver}>
           {active==='version' ? (
@@ -1242,6 +1253,8 @@ export default function FeedbackRoom({ onBack }) {
                 </div>
               )}
             </div>
+          ) : active==='clip' ? (
+            <ClipEditor roomMaterial={roomMaterial} roomMats={roomMats} onImport={handleImport} />
           ) : (
             <div className={styles.centerEmpty}>
               <span style={{fontSize:64,opacity:.15}}>🎬</span>
@@ -1251,6 +1264,8 @@ export default function FeedbackRoom({ onBack }) {
           )}
         </div>
 
+        {active==='version' && (
+        <>
         <div className={styles.edgeZoneRight} onMouseEnter={()=>{clearTimeout(hideRightTimer.current);setShowRight(true)}} title="靠近显示反馈/画笔" />
 
         <div className={`${styles.rightPanel} ${showRight?styles.rightOpen:''}`}
@@ -1305,7 +1320,9 @@ export default function FeedbackRoom({ onBack }) {
               </div>
             </div>
           </div>
-        </div>
+        </>
+        )}
+      </div>
 
       {confirmBox && (
         <div className={styles.confirmMask} onClick={()=>setConfirmBox(null)}>

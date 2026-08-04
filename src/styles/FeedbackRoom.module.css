@@ -391,3 +391,99 @@
 }
 .libOk:hover { background: #4f46e5; }
 .libOk:disabled { background: #312e81; color: #818cf8; cursor: not-allowed; }
+
+.clipStage { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 12px 16px; box-sizing: border-box; gap: 10px; }
+.clipPlayer { flex: 1; min-height: 0; background: #0f1117; border: 1px solid #1e2130; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; }
+.clipVideo { flex: 1; width: 100%; min-height: 0; object-fit: contain; background: #000; }
+.clipEmpty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #64748b; font-size: 14px; }
+.clipControls { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #16181f; border-top: 1px solid #1e2130; }
+.clipTrack { height: 150px; flex-shrink: 0; background: #16181f; border: 1px solid #1e2130; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; }
+.clipTrackHeader { padding: 8px 14px; font-size: 12px; font-weight: 600; color: #94a3b8; border-bottom: 1px solid #1e2130; display: flex; justify-content: space-between; align-items: center; }
+.clipTrackBody { flex: 1; display: flex; align-items: center; gap: 2px; padding: 10px 12px; overflow-x: auto; position: relative; }
+.clipTrackEmpty { color: #475569; font-size: 13px; }
+.clipBlock { position: relative; height: 62px; background: rgba(99,102,241,0.22); border: 1px solid #6366f1; border-radius: 6px; display: flex; flex-direction: column; justify-content: center; padding: 4px 18px; cursor: grab; flex-shrink: 0; box-sizing: border-box; user-select: none; }
+.clipBlock:active { cursor: grabbing; }
+.clipName { font-size: 11px; color: #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clipDur { font-size: 10px; color: #94a3b8; }
+.clipDel { position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; border: none; background: rgba(0,0,0,0.5); color: #ef4444; font-size: 11px; cursor: pointer; line-height: 1; }
+.clipResize, .clipResizeR { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.clipResize { left: 0; }
+.clipResizeR { right: 0; }
+
+.clipRuler { position: relative; height: 20px; border-bottom: 1px solid #1e2130; margin: 0 12px; flex-shrink: 0; }
+.clipRulerMark { position: absolute; top: 0; height: 100%; }
+.clipRulerLine { position: absolute; top: 0; bottom: 8px; width: 1px; background: #475569; }
+.clipRulerLabel { position: absolute; bottom: 0; left: -12px; font-size: 9px; color: #64748b; white-space: nowrap; }
+.clipPlayhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 5; box-shadow: 0 0 4px rgba(239,68,68,0.5); transition: left 0.05s linear; }
+.clipTrackBody { position: relative; flex: 1; display: flex; align-items: center; gap: 2px; padding: 4px 12px; overflow-x: auto; }
+.clipBlock { position: relative; height: 52px; background: rgba(99,102,241,0.25); border: 1px solid #6366f1; border-radius: 4px; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: grab; flex-shrink: 0; box-sizing: border-box; user-select: none; font-size: 11px; }
+.clipBlock:hover { background: rgba(99,102,241,0.35); }
+.clipName { color: #e2e8f0; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clipBlockBtn { position: absolute; top: 2px; right: 4px; width: 16px; height: 16px; border-radius: 50%; border: none; background: rgba(0,0,0,0.4); color: #ef4444; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.clipResizeLeft, .clipResizeRight { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.clipResizeLeft { left: 0; } .clipResizeRight { right: 0; }
+
+.clipRatioBar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: #16181f; border-bottom: 1px solid #1e2130; }
+.clipRatioLabel { font-size: 11px; color: #64748b; margin-right: 4px; }
+.clipRatioBtn { padding: 3px 10px; border-radius: 4px; border: 1px solid #1e2130; background: transparent; color: #94a3b8; font-size: 11px; cursor: pointer; font-family: inherit; }
+.clipRatioBtn:hover { background: #1e2130; color: #e2e8f0; }
+.clipRatioOn { background: #6366f1; border-color: #6366f1; color: #fff; }
+
+.clipCanvas { background: #000; margin: auto; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.clipCanvas video { width: 100%; height: 100%; object-fit: contain; }
+
+
+/* Grid layout: ratio bar | player | track - independent rows */
+.clipStage { display: grid; grid-template-rows: auto 1fr auto; height: 100%; padding: 8px 12px; box-sizing: border-box; gap: 6px; overflow: hidden; }
+.clipPlayer { display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: #0f1117; border: 1px solid #1e2130; border-radius: 10px; }
+.clipCanvas { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; position: relative; }
+.clipCanvas video { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.clipControls { padding: 8px 12px; background: #16181f; border-top: 1px solid #1e2130; display: flex; align-items: center; gap: 8px; }
+.clipTrack { height: 150px; overflow: hidden; background: #16181f; border: 1px solid #1e2130; border-radius: 10px; display: flex; flex-direction: column; }
+
+
+/* Clip track */
+.clipStage{width:100%;height:100%;display:grid;grid-template-rows:auto 1fr auto;padding:8px 12px;box-sizing:border-box;gap:6px;overflow:hidden}
+.clipPreview{display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
+.clipPlayer{display:flex;flex-direction:column;background:#0f1117;border:1px solid #1e2130;border-radius:10px;overflow:hidden;max-height:100%}
+.clipCanvas{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000}
+.clipCanvas video{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.clipEmpty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#64748b;font-size:13px;gap:8px}
+.clipControls{padding:8px 12px;background:#16181f;border-top:1px solid #1e2130;display:flex;align-items:center;gap:8px}
+.clipRatioBar{display:flex;align-items:center;gap:6px;padding:4px 0}
+.clipRatioLabel{font-size:11px;color:#64748b}
+.clipRatioBtn{padding:3px 10px;border-radius:4px;border:1px solid #1e2130;background:transparent;color:#94a3b8;font-size:11px;cursor:pointer;font-family:inherit}
+.clipRatioBtn:hover{background:#1e2130;color:#e2e8f0}
+.clipRatioOn{background:#6366f1;border-color:#6366f1;color:#fff}
+.clipTrack{overflow:hidden;background:#16181f;border:1px solid #1e2130;border-radius:10px;display:flex;flex-direction:column;height:150px}
+.clipTrackHead{padding:6px 12px;font-size:12px;font-weight:600;color:#94a3b8;border-bottom:1px solid #1e2130;display:flex;justify-content:space-between;align-items:center}
+.clipTrackRuler{position:relative;height:18px;margin:0 12px;border-bottom:1px solid #1e2130}
+.clipRuler{position:absolute;top:0;height:100%}
+.clipRulerLine{position:absolute;top:0;bottom:8px;width:1px;background:#475569}
+.clipRulerLabel{position:absolute;bottom:0;left:-12px;font-size:9px;color:#64748b}
+.clipPlayhead{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:5;box-shadow:0 0 4px rgba(239,68,68,0.5);transition:left .05s linear}
+.clipTrackBody{flex:1;display:flex;align-items:center;gap:2px;padding:4px 12px;overflow-x:auto}
+.clipBlock{position:relative;height:48px;min-width:24px;background:rgba(99,102,241,0.25);border:1px solid #6366f1;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;flex-shrink:0;box-sizing:border-box;user-select:none;gap:1px}
+.clipBlock:hover{background:rgba(99,102,241,0.35)}
+.clipBlockName{font-size:10px;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px}
+.clipBlockDur{font-size:9px;color:#94a3b8}
+.clipBlockDel{position:absolute;top:1px;right:3px;width:14px;height:14px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#ef4444;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+
+.clipStage{display:grid;grid-template-rows:1fr auto;height:100%;padding:8px 12px;box-sizing:border-box;gap:6px;overflow:hidden}
+.clipPreview{display:flex;align-items:center;justify-content:center;min-height:0}
+.clipPlayer{display:flex;flex-direction:column;background:#0f1117;border:1px solid #1e2130;border-radius:10px;overflow:hidden;max-height:100%;min-width:320px}
+.clipCanvas{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000}
+.clipCanvas video{max-width:100%;max-height:100%;object-fit:contain}
+.clipEmpty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#64748b;gap:8px;font-size:14px}
+.clipControls{padding:8px 12px;background:#16181f;border-top:1px solid #1e2130;display:flex;align-items:center;gap:8px}
+.clipTrack{height:150px;overflow:hidden;background:#16181f;border:1px solid #1e2130;border-radius:10px;display:flex;flex-direction:column}
+.clipTrackHead{padding:6px 12px;font-size:12px;font-weight:600;color:#94a3b8;border-bottom:1px solid #1e2130}
+.clipTrackBody{flex:1;display:flex;align-items:center;gap:2px;padding:4px 12px;overflow-x:auto;color:#475569;font-size:12px}
+.clipBlock{position:relative;height:44px;background:rgba(99,102,241,0.25);border:1px solid #6366f1;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;flex-shrink:0;box-sizing:border-box;user-select:none;overflow:hidden}
+.clipBlock:hover{background:rgba(99,102,241,0.35)}
+.clipBlockName{font-size:10px;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clipBlockDur{font-size:9px;color:#94a3b8}
+.clipBlockDel{position:absolute;top:1px;right:2px;width:14px;height:14px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#ef4444;font-size:9px;cursor:pointer}
+
+.clipStage{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;gap:20px}.clipInfo{color:#94a3b8;font-size:16px;text-align:center;line-height:2}.clipTrackSimple{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;padding:12px;background:#16181f;border:1px solid #1e2130;border-radius:10px;min-height:60px;min-width:200px}.clipBlock{position:relative;height:44px;background:rgba(99,102,241,0.25);border:1px solid #6366f1;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;flex-shrink:0}.clipBlock:hover{background:rgba(99,102,241,0.35)}.clipBlockName{font-size:10px;color:#e2e8f0}.clipBlockDur{font-size:9px;color:#94a3b8}.clipBlockDel{position:absolute;top:1px;right:2px;width:14px;height:14px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#ef4444;font-size:9px;cursor:pointer}
