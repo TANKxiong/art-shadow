@@ -1,0 +1,35 @@
+画影客 Maya 插件 - 换电脑使用说明
+====================================
+
+包里 3 个文件，任选一种方式：
+
+【方式一：拖入即用（最简单，推荐）】
+1. 打开 Maya
+2. 把「画影客工具_拖入即用.py」直接拖进 Maya 视图窗口
+3. 自动弹出「画影客工具」窗口 + 菜单栏出现「画影客」
+※ 缺点：重启 Maya 后菜单会消失，需要重新拖
+
+【方式二：永久安装（重启菜单还在）】
+1. 把「scripts」文件夹里的 artshadow_ref.py 复制到：
+   C:\Users\你的用户名\Documents\maya\scripts\
+   （如果目录不存在就新建）
+2. 把「userSetup.py」也复制到同一个目录
+   ※ 如果该目录已有 userSetup.py（其他软件在用）：
+     不要覆盖！用记事本打开，在末尾追加：
+     try:
+         import artshadow_ref
+         artshadow_ref.build_menu()
+     except Exception:
+         pass
+3. 完全关闭 Maya，重新打开
+4. 菜单栏自动出现「画影客」菜单
+
+【方式三：手动加载（应急）】
+打开 Maya 脚本编辑器（Python 标签），运行：
+import sys
+sys.path.insert(0, r'C:\Users\你的用户名\Documents\maya\scripts')
+import artshadow_ref
+artshadow_ref.show()
+
+====================================
+功能：参考序列导入 / 音频导入 / 定在原地 / 原地循环走

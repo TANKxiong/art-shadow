@@ -1154,64 +1154,7 @@ if __name__ == '__main__':
     show()
 
 
-# Maya 拖放加载入口：拖入 .py 到 Maya 视图 → 自动打开工具窗口 + 注册菜单
+# Maya 拖放加载入口（消除 DROP 警告，拖入 .py 自动加载菜单）
 def onMayaDroppedPythonFile(*args):
-    try:
-        build_menu()
-    except Exception as e:
-        print(u'[画影客] 菜单注册失败: %s' % e)
-    try:
-        show()
-        print(u'[画影客] 工具窗口已打开')
-    except Exception as e:
-        print(u'[画影客] 打开窗口失败: %s' % e)
-    # ===== 自动安装：复制到 Maya scripts 目录，重启后菜单永久生效 =====
-    try:
-        import shutil
-        import os as _os
-        import io as _io
-        src = None
-        if args and args[0]:
-            src = str(args[0])
-        if not src or not _os.path.exists(src):
-            try:
-                src = __file__
-            except Exception:
-                src = None
-        if not src or not _os.path.exists(src):
-            print(u'[画影客] 无法定位插件文件，跳过自动安装（本次仍可用）')
-            return
-        user_dir = cmds.internalVar(userAppDir=True)
-        scripts_dir = _os.path.join(user_dir, 'scripts')
-        if not _os.path.isdir(scripts_dir):
-            _os.makedirs(scripts_dir)
-        dst = _os.path.join(scripts_dir, 'artshadow_ref.py')
-        if _os.path.abspath(src).lower() != _os.path.abspath(dst).lower():
-            shutil.copy2(src, dst)
-        us = _os.path.join(scripts_dir, 'userSetup.py')
-        add_block = (
-            u'\n# ===== artshadow (auto load) =====\n'
-            u'try:\n    import sys as _sys\n    import os as _os2\n'
-            u'    _p = _os2.path.dirname(_os2.path.abspath(__file__))\n'
-            u'    if _p and _p not in _sys.path:\n        _sys.path.insert(0, _p)\n'
-            u'    import artshadow_ref\n    artshadow_ref.build_menu()\n'
-            u'except Exception:\n    pass\n'
-        )
-        if _os.path.exists(us):
-            with _io.open(us, 'r', encoding='utf-8') as f:
-                content = f.read()
-            if 'artshadow' not in content:
-                try:
-                    with _io.open(us + '.bak', 'w', encoding='utf-8') as f:
-                        f.write(content)
-                except Exception:
-                    pass
-                with _io.open(us, 'a', encoding='utf-8') as f:
-                    f.write(add_block)
-        else:
-            with _io.open(us, 'w', encoding='utf-8') as f:
-                f.write(u'# Maya userSetup.py\n' + add_block)
-        print(u'[画影客] 已自动安装到: %s' % scripts_dir)
-        print(u'[画影客] 重启 Maya 后菜单永久生效（本次已可用）')
-    except Exception as e:
-        print(u'[画影客] 自动安装跳过: %s' % e)
+    build_menu()
+    print(u'[画影客] 插件已加载，菜单栏可找到「画影客」')

@@ -24,6 +24,7 @@ export default function PreviewModal() {
   const [muted, setMuted] = useState(false)
   const [timelineDrag, setTimelineDrag] = useState(false)
   const [loop, setLoop] = useState(false)
+  const [flipH, setFlipH] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [loopRange, setLoopRange] = useState(null)
   const [loopDrag, setLoopDrag] = useState(null)
@@ -296,6 +297,7 @@ export default function PreviewModal() {
                   ref={videoRef}
                   src={videoSrc}
                   className={styles.video}
+                  style={{ transform: flipH ? 'scaleX(-1)' : 'none' }}
                   onLoadedMetadata={onVideoLoaded}
                   onDurationChange={onDurationChange}
                   onTimeUpdate={onTimeUpdate}
@@ -330,6 +332,11 @@ export default function PreviewModal() {
                 <button className={`${styles.ctrlBtn} ${loop ? styles.active : ''}`}
                   onClick={() => { const v=videoRef.current; if(v){ v.loop=!v.loop; setLoop(v.loop) } }} title="循环播放">
                   🔁
+                </button>
+                {/* Flip horizontal */}
+                <button className={`${styles.ctrlBtn} ${flipH ? styles.active : ''}`}
+                  onClick={() => setFlipH(f => !f)} title="水平镜像">
+                  🪞
                 </button>
                 {/* Fullscreen */}
                 <button className={styles.ctrlBtn} onClick={toggleFullscreen} title={isFullscreen?'退出全屏':'全屏'}>
@@ -413,7 +420,7 @@ export default function PreviewModal() {
             )
           ) : (
             videoSrc ? (
-              <img src={videoSrc} alt={previewMaterial.originalName} className={styles.image} />
+              <img src={videoSrc} alt={previewMaterial.originalName} className={styles.image} style={{ transform: flipH ? 'scaleX(-1)' : 'none' }} />
             ) : (
               <div className={styles.placeholder}>
                 <span style={{fontSize:'48px'}}>🖼️</span>

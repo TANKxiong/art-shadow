@@ -1,0 +1,19 @@
+画影客 Maya 插件 安装说明
+============================
+
+【安装方法】
+1. 打开 Maya
+2. 把这个 .mzp 文件直接【拖进 Maya 的 3D 视图窗口】（或 视图菜单 Window -> Settings/Preferences -> Plug-in Manager 附近也会弹出安装提示）
+3. 按提示确认安装
+4. 重启 Maya
+
+【使用方法】
+重启 Maya 后，菜单栏会出现「画影客」菜单：
+- 导入工具 -> 打开导入工具窗口（参考序列导入 / 音频 / 角色工具）
+- 打开窗口后可：导入参考序列、导入音频、定在原地、原地循环走
+
+【卸载方法】
+删除 Maya 用户目录下的：
+- Documents/maya/scripts/artshadow_ref.py
+- Documents/maya/scripts/userSetup.py
+（userSetup.py 如果是你自己的文件，请手动移除文件里画影客相关内容）
