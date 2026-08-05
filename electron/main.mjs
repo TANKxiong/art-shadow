@@ -83,9 +83,55 @@ function startFileServer() {
   } catch(e) { console.log('Server port busy, trying alternatives...') }
 }
 
+// 默认分类（与网页版 demo 数据一致，打包版首次运行自动创建）
+const DEFAULT_CATEGORIES = [
+  { id:'cat1', name:'武侠/国风仙侠动作', parentId:null },
+  { id:'cat1a', name:'基础移动动作', parentId:'cat1' },
+  { id:'cat1a1', name:'行走', parentId:'cat1a' },
+  { id:'cat1a2', name:'奔跑', parentId:'cat1a' },
+  { id:'cat1a3', name:'跳跃', parentId:'cat1a' },
+  { id:'cat1a4', name:'闪避', parentId:'cat1a' },
+  { id:'cat1b', name:'冷兵器动作', parentId:'cat1' },
+  { id:'cat1b1', name:'刀剑', parentId:'cat1b' },
+  { id:'cat1b2', name:'长柄武器', parentId:'cat1b' },
+  { id:'cat1b3', name:'短兵器', parentId:'cat1b' },
+  { id:'cat1b4', name:'软兵器', parentId:'cat1b' },
+  { id:'cat1c', name:'徒手武术动作', parentId:'cat1' },
+  { id:'cat1d', name:'武侠特色特技动作', parentId:'cat1' },
+  { id:'cat2', name:'写实人类动作', parentId:null },
+  { id:'cat2a', name:'基础移动', parentId:'cat2' },
+  { id:'cat2b', name:'肢体交互', parentId:'cat2' },
+  { id:'cat2c', name:'现代格斗', parentId:'cat2' },
+  { id:'cat3', name:'卡通风格动作', parentId:null },
+  { id:'cat3a', name:'基础移动', parentId:'cat3' },
+  { id:'cat3b', name:'卡通战斗动作', parentId:'cat3' },
+  { id:'cat3c', name:'卡通表演动作', parentId:'cat3' },
+  { id:'cat4', name:'奇幻魔幻动作', parentId:null },
+  { id:'cat5', name:'竞技战斗动作', parentId:null },
+  { id:'cat6', name:'日常表演&情绪肢体', parentId:null },
+  { id:'cat7', name:'非人&生物动作', parentId:null },
+  { id:'cat8', name:'载具与联动动作', parentId:null },
+]
+
 function loadData() {
-  try { if (fs.existsSync(dbPath)) return JSON.parse(fs.readFileSync(dbPath, 'utf-8')) } catch (e) {}
-  return { categories: [], materials: [], tags: [] }
+  try {
+    if (fs.existsSync(dbPath)) {
+      const data = JSON.parse(fs.readFileSync(dbPath, 'utf-8'))
+      // 兼容旧数据：分类为空时补上默认分类
+      if (!data.categories || data.categories.length === 0) {
+        const now = new Date().toISOString()
+        data.categories = DEFAULT_CATEGORIES.map(c => ({ ...c, createdAt: now }))
+        try { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)) } catch (e) {}
+      }
+      return data
+    }
+  } catch (e) {}
+  // 首次运行：初始化默认分类
+  const now = new Date().toISOString()
+  const cats = DEFAULT_CATEGORIES.map(c => ({ ...c, createdAt: now }))
+  const demo = { categories: cats, materials: [], tags: [] }
+  try { fs.writeFileSync(dbPath, JSON.stringify(demo, null, 2)) } catch (e) {}
+  return demo
 }
 function saveData(data) { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)) }
 
