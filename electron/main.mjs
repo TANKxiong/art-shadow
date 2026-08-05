@@ -245,9 +245,10 @@ ipcMain.handle('export:imageSequence', async (_, { filePath, outDir, fps }) => {
     fs.mkdirSync(outDir, { recursive: true })
     const rate = Math.max(1, Math.min(60, Math.round(fps || 25)))
     // 清空目录旧帧
-    for (const f of fs.readdirSync(outDir)) { if (/^\d+\.png$/.test(f)) fs.unlinkSync(path.join(outDir, f)) }
+    for (const f of fs.readdirSync(outDir)) { if (/^(frame_|ref\.)\d+\.png$/.test(f)) fs.unlinkSync(path.join(outDir, f)) }
     await new Promise((resolve, reject) => {
-      const pattern = path.join(outDir, '%05d.png')
+      // Maya 点号格式序列命名：ref.1.png（Maya 用 ref.#.png 识别，无需二次转换）
+      const pattern = path.join(outDir, 'ref.%d.png')
       const proc = spawn(ffmpegPath, [
         '-y', '-i', filePath,
         '-vf', 'fps=' + rate,
