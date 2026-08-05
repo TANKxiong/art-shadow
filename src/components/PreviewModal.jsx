@@ -258,7 +258,7 @@ export default function PreviewModal() {
                     if (btn) btn.textContent = '⏳ 转换中…'
                     const res = await window.electronAPI.exportImageSequence(rawPath, outDir, 25)
                     if (res && res.ok) {
-                      alert('✅ 已导出 ' + res.frameCount + ' 帧 PNG 序列到：\n' + res.outDir + '\n\n在 Maya 中运行 artshadow_ref.py，选择该文件夹即可导入参考')
+                      alert('✅ 已导出 ' + res.frameCount + ' 帧 PNG 序列到：\n' + res.outDir + (res.hasAudio ? '\n🎵 已同步导出音频（ref_audio.wav），导入时自动加载' : '') + '\n\n在 Maya 中运行 artshadow_ref.py，选择该文件夹即可导入参考')
                     } else {
                       alert('导出失败：' + ((res && res.error) || '未知错误'))
                     }

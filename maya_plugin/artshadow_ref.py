@@ -346,6 +346,74 @@ def jump_start():
 
 def jump_end():
     cmds.currentTime(cmds.playbackOptions(q=True, max=True))
+def load_audio(audio_path, offset=0):
+    """导入音频文件到 Maya 时间轴（wav/mp3 等），返回 audio 节点名"""
+    if not audio_path or not os.path.exists(audio_path):
+        print(u'[画影客] 音频文件不存在: %s' % audio_path)
+        return None
+    audio_path = audio_path.replace('\\', '/')
+    try:
+        # 先清理同名的旧 audio 节点（避免重复导入）
+        want_base = os.path.basename(audio_path).lower()
+        for node in cmds.ls(type='audio'):
+            try:
+                fn = cmds.getAttr(node + '.filename') or ''
+                if os.path.basename(fn.replace('\\', '/').lower()) == want_base:
+                    cmds.delete(node)
+            except Exception:
+                pass
+        # 导入音频（Maya 通过 file import 创建 audio 节点）
+        imported = cmds.file(audio_path, i=True, type='audio')
+        node = None
+        if isinstance(imported, (list, tuple)) and imported:
+            for it in imported:
+                if cmds.nodeType(it) == 'audio':
+                    node = it
+                    break
+            if not node:
+                node = imported[-1]
+        elif imported:
+            node = imported
+        if not node:
+            audios = cmds.ls(type='audio')
+            node = audios[-1] if audios else None
+        if node:
+            try:
+                cmds.setAttr(node + '.offset', float(offset))
+            except Exception:
+                pass
+            try:
+                d = cmds.getAttr(node + '.duration')
+                if d:
+                    end = max(1, int(round(float(d) + float(offset))))
+                    cmds.playbackOptions(max=end, aet=end)
+            except Exception:
+                pass
+            print(u'[画影客] 音频已导入: %s (%s)' % (node, os.path.basename(audio_path)))
+            return node
+        print(u'[画影客] 音频导入后未找到 audio 节点')
+        return None
+    except Exception as e:
+        print(u'[画影客] 音频导入失败: %s' % e)
+        return None
+
+
+def find_audio_in_folder(folder):
+    """在文件夹中查找音频文件（ref_audio.wav 优先）"""
+    if not folder or not os.path.isdir(folder):
+        return None
+    try:
+        pref = os.path.join(folder, 'ref_audio.wav')
+        if os.path.exists(pref):
+            return pref
+        for f in sorted(os.listdir(folder)):
+            if f.lower().endswith(('.wav', '.mp3', '.aif', '.aiff', '.m4a')):
+                return os.path.join(folder, f)
+    except Exception:
+        pass
+    return None
+
+
 
 
 # ---------------------------------------------------------------
@@ -360,7 +428,7 @@ class ReferenceImporter(object):
         if cmds.window(self.window, exists=True):
             cmds.deleteUI(self.window)
         self.window = cmds.window(self.window, title=u'画影客工具',
-                                  widthHeight=(430, 560), sizeable=True)
+                                  widthHeight=(430, 420), sizeable=True)
         cmds.window(self.window, edit=True, minimizeButton=True)
 
         cmds.columnLayout(adjustableColumn=True, rowSpacing=4)
@@ -368,8 +436,8 @@ class ReferenceImporter(object):
         # ===== 标题 =====
         cmds.text(label=u'画影客工具', font='boldLabelFont', height=24, align='center')
 
-        # ===== 分区一：导入工具 =====
-        cmds.frameLayout(label=u'导入工具', collapsable=True, collapse=False)
+        # ===== 分区一：导入参考序列 =====
+        cmds.frameLayout(label=u'导入参考序列', collapsable=True, collapse=False)
         cmds.columnLayout(adjustableColumn=True, rowSpacing=4)
         cmds.textFieldButtonGrp('as_folder', label=u'序列文件夹:', buttonLabel=u'浏览...',
                                 buttonCommand=self.browse_folder)
@@ -391,35 +459,25 @@ class ReferenceImporter(object):
         cmds.setParent('..')
         cmds.button(label=u'导入参考', command=self.do_import,
                     bgc=(0.3, 0.45, 0.6), height=26)
+        cmds.text(label=u'提示：若文件夹内有 ref_audio.wav 会自动加载音频',
+                  align='left', font='smallPlainLabelFont')
         cmds.setParent('..')
         cmds.setParent('..')
         cmds.separator(h=4)
 
-        # ===== 分区二：多视角 =====
-        cmds.frameLayout(label=u'多视角参考', collapsable=True, collapse=False)
+        # ===== 分区二：导入音频 =====
+        cmds.frameLayout(label=u'导入音频', collapsable=True, collapse=False)
         cmds.columnLayout(adjustableColumn=True, rowSpacing=4)
-        cmds.text(label=u'一键创建 正面 + 侧面 + 背面 三个参考相机', align='left')
-        cmds.textFieldButtonGrp('as_folder_m', label=u'序列文件夹:', buttonLabel=u'浏览...',
-                                buttonCommand=self.browse_folder)
-        cmds.button(label=u'创建多视角', command=self.do_multi,
+        cmds.text(label=u'手动导入音频文件到 Maya 时间轴（wav/mp3/aif 等）', align='left')
+        cmds.button(label=u'导入音频...', command=self.import_audio,
                     bgc=(0.3, 0.45, 0.6), height=26)
-        cmds.setParent('..')
-        cmds.setParent('..')
-        cmds.separator(h=4)
-
-        # ===== 分区三：时间轴 =====
-        cmds.frameLayout(label=u'时间轴工具', collapsable=True, collapse=False)
-        cmds.columnLayout(adjustableColumn=True, rowSpacing=4)
-        cmds.button(label=u'跳转首帧', command=lambda _: jump_start(), height=24)
-        cmds.button(label=u'跳转末帧', command=lambda _: jump_end(), height=24)
-        cmds.button(label=u'循环播放', command=lambda _: self.toggle_loop(), height=24)
         cmds.setParent('..')
         cmds.setParent('..')
         cmds.separator(h=4)
 
         # ===== 日志 =====
         cmds.frameLayout(label=u'日志', collapsable=True, collapse=False)
-        cmds.scrollField('as_log', editable=False, height=110, wordWrap=True)
+        cmds.scrollField('as_log', editable=False, height=120, wordWrap=True)
         cmds.setParent('..')
         cmds.setParent('..')
 
@@ -436,6 +494,22 @@ class ReferenceImporter(object):
             self.log(u'已开启循环播放')
         except Exception as e:
             self.log(u'循环设置失败: %s' % e)
+
+    def import_audio(self, _=None):
+        """手动选择音频文件导入 Maya"""
+        try:
+            files = cmds.fileDialog2(dialogStyle=2, fileMode=1,
+                                     caption=u'选择音频文件',
+                                     fileFilter=u'音频文件 (*.wav *.mp3 *.aif *.aiff *.m4a);;所有文件 (*.*)')
+            if files:
+                path = files[0]
+                node = load_audio(path)
+                if node:
+                    self.log(u'🎵 音频已导入: %s (%s)' % (node, os.path.basename(path)))
+                else:
+                    self.log(u'❌ 音频导入失败: %s' % path)
+        except Exception as e:
+            self.log(u'❌ 导入音频出错: %s' % e)
 
     def log(self, msg):
         cmds.scrollField('as_log', edit=True, insertText=msg + '\n', insertionPosition=0)
@@ -464,6 +538,11 @@ class ReferenceImporter(object):
             view, scale, fps = self.get_params()
             set_fps(fps)
             cam, plane = create_reference(view, self.folder, img_scale=scale)
+            # 自动加载同目录音频（ref_audio.wav 优先）
+            audio = find_audio_in_folder(self.folder)
+            if audio:
+                load_audio(audio)
+                self.log(u'🎵 已加载音频: %s' % os.path.basename(audio))
             # 诊断：输出 imagePlane 当前 imageName，方便排查看不到的问题
             try:
                 img = cmds.getAttr(plane + '.imageName')
@@ -496,6 +575,11 @@ class ReferenceImporter(object):
             set_fps(fps)
             for v in ('front', 'side', 'back'):
                 create_reference(v, self.folder, img_scale=scale)
+            # 自动加载同目录音频
+            audio = find_audio_in_folder(self.folder)
+            if audio:
+                load_audio(audio)
+                self.log(u'🎵 已加载音频: %s' % os.path.basename(audio))
             self.log(u'✅ 多视角参考已创建 (正面/侧面/背面)')
         except Exception as e:
             self.log(u'❌ 错误: %s' % e)
@@ -517,25 +601,15 @@ def build_menu():
         cmds.deleteUI(menu)
     cmds.menu(menu, label=u'画影客', parent='MayaWindow', tearOff=True)
 
-    # ---- 导入工具（子菜单，集中所有导入功能）----
-    cmds.menuItem(label=u'📥 导入工具', subMenu=True, tearOff=True)
-    cmds.menuItem(label=u'📥 打开导入工具窗口', command=lambda _: show())
-    cmds.menuItem(divider=True, label=u'快速导入')
-    cmds.menuItem(label=u'🎬 创建正面参考', command=lambda _: create_reference('front', _pick_folder()))
-    cmds.menuItem(label=u'📐 创建侧面参考', command=lambda _: create_reference('side', _pick_folder()))
-    cmds.menuItem(label=u'🔄 创建背面参考', command=lambda _: create_reference('back', _pick_folder()))
-    cmds.menuItem(label=u'🎥 创建多视角（正+侧+背）', command=lambda _: create_multi_quick())
-    cmds.setParent('..')
-
-    # ---- 时间轴工具（子菜单）----
-    cmds.menuItem(label=u'⏱ 时间轴工具', subMenu=True)
-    cmds.menuItem(label=u'⏮ 跳转首帧', command=lambda _: jump_start())
-    cmds.menuItem(label=u'⏭ 跳转末帧', command=lambda _: jump_end())
-    cmds.menuItem(label=u'🔁 循环播放', command=lambda _: toggle_loop_menu())
+    # ---- 导入工具（子菜单）----
+    cmds.menuItem(label=u'导入工具', subMenu=True, tearOff=True)
+    cmds.menuItem(label=u'打开导入工具窗口', command=lambda _: show())
+    cmds.menuItem(divider=True)
+    cmds.menuItem(label=u'导入音频...', command=lambda _: import_audio_quick())
     cmds.setParent('..')
 
     cmds.menuItem(divider=True)
-    cmds.menuItem(label=u'❓ 帮助', command=lambda _: show_help())
+    cmds.menuItem(label=u'帮助', command=lambda _: show_help())
 
 
 def toggle_loop_menu():
@@ -544,6 +618,19 @@ def toggle_loop_menu():
         print(u'[画影客] 已开启循环播放')
     except Exception as e:
         print(u'[画影客] 循环设置失败: %s' % e)
+
+
+def import_audio_quick():
+    """菜单快捷入口：选择音频文件导入"""
+    try:
+        files = cmds.fileDialog2(dialogStyle=2, fileMode=1,
+                                 caption=u'选择音频文件',
+                                 fileFilter=u'音频文件 (*.wav *.mp3 *.aif *.aiff *.m4a);;所有文件 (*.*)')
+        if files:
+            node = load_audio(files[0])
+            print(u'[画影客] 音频导入: %s' % (node or u'失败'))
+    except Exception as e:
+        print(u'[画影客] 导入音频出错: %s' % e)
 
 
 def show_help():

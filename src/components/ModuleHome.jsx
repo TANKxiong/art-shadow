@@ -28,10 +28,21 @@ const MODULES = [
   }
 ]
 
-const APP_VERSION = '1.4.3'
+const APP_VERSION = '1.4.4'
 
 const CHANGELOG = [
-    {
+      {
+    version: '1.4.4',
+    date: '2026-08-05',
+    title: 'Maya 参考素材 · 音频同步',
+    items: [
+      '导出序列时同步提取音轨为 ref_audio.wav（素材带音频才生成）',
+      'Maya 插件导入参考时自动加载同目录音频到时间轴，声画同步',
+      '插件新增「导入音频...」按钮：可手动选择任意音频文件导入',
+      '多视角创建同样自动加载音频'
+    ]
+  },
+{
     version: '1.4.3',
     date: '2026-08-05',
     title: 'Maya 参考素材导入优化',

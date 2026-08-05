@@ -261,9 +261,30 @@ ipcMain.handle('export:imageSequence', async (_, { filePath, outDir, fps }) => {
       proc.on('error', reject)
     })
     const frames = fs.readdirSync(outDir).filter(f => f.endsWith('.png')).length
+    // 同步导出音频（如有音轨）：ref_audio.wav，供 Maya 插件导入
+    let hasAudio = false
+    let audioPath = ''
+    try {
+      const audioOut = path.join(outDir, 'ref_audio.wav')
+      if (fs.existsSync(audioOut)) fs.unlinkSync(audioOut)
+      await new Promise((resolve) => {
+        const proc = spawn(ffmpegPath, ['-y', '-i', filePath, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audioOut])
+        let stderr = ''
+        proc.stderr.on('data', d => stderr += d)
+        proc.on('close', (code) => {
+          if (code === 0 && fs.existsSync(audioOut) && fs.statSync(audioOut).size > 1024) {
+            hasAudio = true; audioPath = audioOut
+          } else {
+            try { if (fs.existsSync(audioOut)) fs.unlinkSync(audioOut) } catch(e) {}
+          }
+          resolve()
+        })
+        proc.on('error', () => resolve())
+      })
+    } catch(e) { /* 音频提取失败不影响主流程 */ }
     // 自动打开输出文件夹，方便查看/复制路径
     try { shell.openPath(outDir) } catch(e) {}
-    return { ok: true, frameCount: frames, outDir }
+    return { ok: true, frameCount: frames, outDir, hasAudio, audioPath }
   } catch(e) {
     return { ok: false, error: (e && e.message ? e.message : String(e)).slice(0, 300) }
   }
