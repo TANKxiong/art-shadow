@@ -246,6 +246,25 @@ export default function PreviewModal() {
                   dispatch({ type: 'UPDATE_MATERIAL', payload: { id: previewMaterial.id, thumbnail: dataUrl } })
                   const btn = document.activeElement; if (btn) { btn.textContent = '✅'; setTimeout(() => { btn.textContent = '🖼️ 设为封面' }, 800) }
                 }} title="取当前帧为封面">🖼️ 设为封面</button>
+              <button className={styles.drawToggle}
+                onClick={async () => {
+                  if (!window.electronAPI) { alert('导入 Maya 需要打包版（Electron）'); return }
+                  if (!previewMaterial?.fileName) { alert('该素材无文件路径'); return }
+                  const btn = document.activeElement
+                  try {
+                    const p = await window.electronAPI.getMaterialPath(previewMaterial.fileName)
+                    const rawPath = (p || '').replace('file:///', '').replace(/\//g, '\\')
+                    const outDir = rawPath.replace(/\.[^.]+$/, '_maya')
+                    if (btn) btn.textContent = '⏳ 转换中…'
+                    const res = await window.electronAPI.exportImageSequence(rawPath, outDir, 25)
+                    if (res && res.ok) {
+                      alert('✅ 已导出 ' + res.frameCount + ' 帧 PNG 序列到：\n' + res.outDir + '\n\n在 Maya 中运行 artshadow_ref.py，选择该文件夹即可导入参考')
+                    } else {
+                      alert('导出失败：' + ((res && res.error) || '未知错误'))
+                    }
+                  } catch(e) { alert('导出出错：' + (e.message || e)) }
+                  if (btn) { btn.textContent = '🎬 导入 Maya'; setTimeout(() => {}, 0) }
+                }} title="导出 PNG 序列帧供 Maya 参考素材导入">🎬 导入 Maya</button>
             </>)}
             <button className={`${styles.drawToggle} ${editMode ? styles.drawActive : ''}`}
               onClick={() => { setEditMode(!editMode); setDrawMode(false); if (!editMode) { setEditName(previewMaterial.displayName || previewMaterial.originalName || ''); setEditSource(previewMaterial.source || ''); setEditCat(previewMaterial.categoryId || '') } }} title="编辑信息">✏️ 编辑</button>

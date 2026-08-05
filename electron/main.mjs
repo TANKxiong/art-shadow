@@ -1,4 +1,4 @@
-﻿import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+﻿import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
@@ -236,6 +236,36 @@ ipcMain.handle('dialog:trimVideo', async (_, filePath, startTime, endTime) => {
     })
     proc.on('error', (err) => resolve({ error: 'FFmpeg 执行失败: ' + err.message }))
   })
+})
+
+// 视频 → PNG 序列帧导出（供 Maya 参考素材导入使用）
+ipcMain.handle('export:imageSequence', async (_, { filePath, outDir, fps }) => {
+  if (!ffmpegPath) return { ok: false, error: 'FFmpeg 不可用' }
+  try {
+    fs.mkdirSync(outDir, { recursive: true })
+    const rate = Math.max(1, Math.min(60, Math.round(fps || 25)))
+    // 清空目录旧帧
+    for (const f of fs.readdirSync(outDir)) { if (/^\d+\.png$/.test(f)) fs.unlinkSync(path.join(outDir, f)) }
+    await new Promise((resolve, reject) => {
+      const pattern = path.join(outDir, '%05d.png')
+      const proc = spawn(ffmpegPath, [
+        '-y', '-i', filePath,
+        '-vf', 'fps=' + rate,
+        '-start_number', '1',
+        pattern
+      ])
+      let stderr = ''
+      proc.stderr.on('data', d => stderr += d)
+      proc.on('close', (code) => code === 0 ? resolve() : reject(new Error('ffmpeg code ' + code + ' ' + stderr.slice(-200))))
+      proc.on('error', reject)
+    })
+    const frames = fs.readdirSync(outDir).filter(f => f.endsWith('.png')).length
+    // 自动打开输出文件夹，方便查看/复制路径
+    try { shell.openPath(outDir) } catch(e) {}
+    return { ok: true, frameCount: frames, outDir }
+  } catch(e) {
+    return { ok: false, error: (e && e.message ? e.message : String(e)).slice(0, 300) }
+  }
 })
 
 // Export: receive per-frame JPEG data URLs, encode to MP4 with FFmpeg, then ask user where to save

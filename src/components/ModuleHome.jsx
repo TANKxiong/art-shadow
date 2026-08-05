@@ -28,9 +28,19 @@ const MODULES = [
   }
 ]
 
-const APP_VERSION = '1.4.1'
+const APP_VERSION = '1.4.2'
 
 const CHANGELOG = [
+  {
+    version: '1.4.2',
+    date: '2026-08-05',
+    title: 'Maya 参考素材导入',
+    items: [
+      '视频预览新增「🎬 导入 Maya」：一键导出 PNG 序列帧，供 Maya 参考素材导入',
+      '导出后自动打开序列帧文件夹，方便在 Maya 中选择',
+      '配套 Maya 插件 artshadow_ref.py：自动创建参考相机 + imagePlane'
+    ]
+  },
   {
     version: '1.4.1',
     date: '2026-08-04',

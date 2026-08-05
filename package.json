@@ -1,6 +1,6 @@
 {
   "name": "art-shadow",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "参考素材管理软件",
   "type": "module",
   "main": "electron/main.mjs",
